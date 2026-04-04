@@ -1,0 +1,8 @@
+.git
+.gradle
+build
+.idea
+
+# Never bake secrets into image layers
+.env
+*.env
