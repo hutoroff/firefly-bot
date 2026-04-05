@@ -1,10 +1,10 @@
 # Firefly Bot
 
-A Telegram bot that creates transactions in [Firefly III](https://www.firefly-iii.org/) (API v6.1.0) via a conversational interface.
+A Telegram bot that creates transactions in [Firefly III](https://www.firefly-iii.org/) (API v6.1.0) via a conversational wizard interface.
 
 ## Requirements
 
-- Docker + Docker Compose, **or** JDK 21 + Gradle 8.10 for local development
+- Docker + Docker Compose, **or** JDK 21 for local development
 - A running Firefly III instance with a Personal Access Token
 - A Telegram bot token from [@BotFather](https://t.me/BotFather)
 
@@ -36,7 +36,7 @@ docker compose up --build
 ### Local
 
 ```bash
-gradle shadowJar
+JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle shadowJar --no-daemon
 java -jar build/libs/firefly-bot-1.0.0.jar
 ```
 
@@ -45,7 +45,7 @@ java -jar build/libs/firefly-bot-1.0.0.jar
 Send `/new` to start a guided wizard that walks you through creating a transaction:
 
 1. Choose type — **Transfer**, **Withdrawal**, or **Deposit**
-2. Select accounts (asset accounts fetched from Firefly III; expense/revenue accounts searchable by name)
+2. Select accounts (asset accounts from mock/Firefly III; expense/revenue accounts searchable by name)
 3. Enter amount(s); cross-currency transfers prompt for both sides separately
 4. Pick a category (Withdrawal and Deposit)
 5. Review the preview — optionally change the date/time or add a tag
@@ -53,42 +53,82 @@ Send `/new` to start a guided wizard that walks you through creating a transacti
 
 All interactions happen inside a single message that is edited in place (no message spam).
 
+## Architecture
+
+The project follows **hexagonal architecture** (ports & adapters):
+
+```
+Telegram update
+      │
+  FireflyBot          (inbound adapter — adapter/in/telegram/)
+      │
+  WizardUseCase       (inbound port interface)
+      │
+  WizardService       (application service — pure business logic, no Telegram imports)
+      │
+  AccountRepository   (outbound port)
+  CategoryRepository  (outbound port)
+  TransactionRepository (outbound port)
+  WizardSessionRepository (outbound port)
+      │
+  MockAccountAdapter  ──▶  MockData         (current)
+  FireflyTransactionAdapter ──▶ Firefly III REST API  (ready to wire)
+```
+
 ## Project structure
 
 ```
 src/main/kotlin/com/fireflybot/
   Main.kt                               Entry point — wires Koin and registers the bot
   config/AppConfig.kt                   Reads and validates environment variables
-  di/AppModule.kt                       Koin module definitions
-  firefly/
-    FireflyClient.kt                    Firefly III API calls
-    MockData.kt                         Dev-time mock data (replaced by real API calls)
-    model/Account.kt                    Account(id, name, currencyCode)
-    model/Category.kt                   Category(id, name)
-    model/TransactionRequest.kt         StoreTransactionRequest, TransactionSplit
-    model/TransactionResponse.kt        TransactionSingle, TransactionRead
-  telegram/
-    FireflyBot.kt                       Telegram long-polling bot; dispatches to WizardHandler
-    wizard/
-      WizardStep.kt                     Sealed class — all wizard states
-      WizardSession.kt                  Immutable per-chat state (step, accounts, amounts, …)
-      WizardSessionStore.kt             Thread-safe ConcurrentHashMap<chatId, session>
-      WizardHandler.kt                  Full wizard logic and message editing
+  di/AppModule.kt                       Koin module — all bindings in one place
+
+  domain/model/
+    Account.kt                          Account(id, name, currencyCode)
+    Category.kt                         Category(id, name)
+    TransactionType.kt                  Enum: TRANSFER, WITHDRAWAL, DEPOSIT
+    Transaction.kt                      Sealed class hierarchy with previewText() / successText()
+
+  application/
+    port/in/WizardUseCase.kt            Inbound port interface
+    port/out/AccountRepository.kt       Outbound port — asset / expense / revenue account lookup
+    port/out/CategoryRepository.kt      Outbound port — category list
+    port/out/TransactionRepository.kt   Outbound port — create transaction
+    port/out/WizardSessionRepository.kt Outbound port — session persistence
+    wizard/WizardStep.kt                Sealed class — all wizard states
+    wizard/WizardSession.kt             Immutable per-chat state (step, accounts, amounts, …)
+    wizard/WizardResult.kt              Sealed class — what the service wants to render
+    wizard/WizardService.kt             Implements WizardUseCase; zero Telegram imports
+
+  adapter/in/telegram/
+    FireflyBot.kt                       Slim dispatcher: update → useCase → presenter
+    TelegramWizardPresenter.kt          All Telegram rendering (keyboards, edit/send)
+
+  adapter/out/firefly/
+    FireflyTransactionAdapter.kt        Implements TransactionRepository via Ktor HTTP
+    dto/TransactionRequest.kt           Firefly III API request DTOs
+    dto/TransactionResponse.kt          Firefly III API response DTOs
+
+  adapter/out/mock/
+    MockData.kt                         7 asset, 10 expense, 8 revenue accounts; 10 categories; 8 tags
+    MockAccountAdapter.kt               Implements AccountRepository (in-memory search)
+    MockCategoryAdapter.kt              Implements CategoryRepository
+    MockTransactionAdapter.kt           Implements TransactionRepository (logs, no HTTP)
+    InMemoryWizardSessionRepository.kt  Implements WizardSessionRepository (ConcurrentHashMap)
 ```
 
-## Architecture
+## Switching to real Firefly III data
 
-```
-Telegram update
-      │
-  FireflyBot (TelegramLongPollingBot)
-      │
-  WizardHandler ── WizardSessionStore
-      │
-  FireflyClient (Ktor/OkHttp)
-      │
-  Firefly III REST API
+Accounts and categories currently use mock adapters. To wire real API calls, replace the
+relevant binding in `di/AppModule.kt`:
+
+```kotlin
+// Current (mock):
+single<TransactionRepository> { MockTransactionAdapter() }
+
+// Real Firefly III:
+single<TransactionRepository> { FireflyTransactionAdapter(get(), get()) }
 ```
 
-Dependency injection is handled by Koin. The single module (`appModule`) provides
-`AppConfig` → `HttpClient` → `FireflyClient` → `WizardSessionStore` → `WizardHandler` → `FireflyBot`.
+Implement `FireflyAccountAdapter` and `FireflyCategoryAdapter` similarly once the Firefly III
+account/category endpoints are needed.

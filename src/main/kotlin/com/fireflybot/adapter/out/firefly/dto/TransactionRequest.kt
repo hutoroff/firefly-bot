@@ -1,4 +1,4 @@
-package com.fireflybot.firefly.model
+package com.fireflybot.adapter.out.firefly.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

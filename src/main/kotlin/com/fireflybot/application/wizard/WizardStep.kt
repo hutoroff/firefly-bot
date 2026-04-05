@@ -1,4 +1,4 @@
-package com.fireflybot.telegram.wizard
+package com.fireflybot.application.wizard
 
 sealed class WizardStep {
     data object SelectType : WizardStep()

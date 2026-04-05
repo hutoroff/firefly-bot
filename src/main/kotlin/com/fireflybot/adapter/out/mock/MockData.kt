@@ -1,7 +1,7 @@
-package com.fireflybot.firefly
+package com.fireflybot.adapter.out.mock
 
-import com.fireflybot.firefly.model.Account
-import com.fireflybot.firefly.model.Category
+import com.fireflybot.domain.model.Account
+import com.fireflybot.domain.model.Category
 
 object MockData {
     val accounts = listOf(

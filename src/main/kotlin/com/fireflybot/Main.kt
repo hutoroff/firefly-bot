@@ -1,7 +1,7 @@
 package com.fireflybot
 
 import com.fireflybot.di.appModule
-import com.fireflybot.telegram.FireflyBot
+import com.fireflybot.adapter.`in`.telegram.FireflyBot
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.koin.core.context.startKoin
 import org.telegram.telegrambots.meta.TelegramBotsApi

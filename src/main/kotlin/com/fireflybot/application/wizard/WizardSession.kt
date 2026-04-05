@@ -1,16 +1,17 @@
-package com.fireflybot.telegram.wizard
+package com.fireflybot.application.wizard
 
-import com.fireflybot.firefly.model.Account
-import com.fireflybot.firefly.model.Category
+import com.fireflybot.domain.model.Account
+import com.fireflybot.domain.model.Category
+import com.fireflybot.domain.model.TransactionType
 import java.time.LocalDateTime
 
 data class WizardSession(
     val chatId: Long,
     val step: WizardStep = WizardStep.SelectType,
-    val type: String? = null,
+    val transactionType: TransactionType? = null,
     val sourceAccount: Account? = null,
     val destinationAccount: Account? = null,
-    /** Amount for same-currency transfers and withdrawals. */
+    /** Amount for same-currency transfers and withdrawals/deposits. */
     val amount: String? = null,
     /** Withdrawal amount in source currency (cross-currency transfers). */
     val sourceAmount: String? = null,
@@ -18,7 +19,7 @@ data class WizardSession(
     val destAmount: String? = null,
     val dateTime: LocalDateTime = LocalDateTime.now(),
     val tag: String? = null,
-    /** Selected category (withdrawal only). */
+    /** Selected category (withdrawal and deposit only). */
     val category: Category? = null,
     /** Last expense-account search query; retained so page navigation can re-filter without re-asking. */
     val expenseAccountQuery: String? = null,

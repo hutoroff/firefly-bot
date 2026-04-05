@@ -1,10 +1,18 @@
 package com.fireflybot.di
 
+import com.fireflybot.adapter.`in`.telegram.FireflyBot
+import com.fireflybot.adapter.`in`.telegram.TelegramWizardPresenter
+import com.fireflybot.adapter.out.mock.InMemoryWizardSessionRepository
+import com.fireflybot.adapter.out.mock.MockAccountAdapter
+import com.fireflybot.adapter.out.mock.MockCategoryAdapter
+import com.fireflybot.adapter.out.mock.MockData
+import com.fireflybot.adapter.out.mock.MockTransactionAdapter
+import com.fireflybot.application.port.out.AccountRepository
+import com.fireflybot.application.port.out.CategoryRepository
+import com.fireflybot.application.port.out.TransactionRepository
+import com.fireflybot.application.port.out.WizardSessionRepository
+import com.fireflybot.application.wizard.WizardService
 import com.fireflybot.config.AppConfig
-import com.fireflybot.firefly.FireflyClient
-import com.fireflybot.telegram.FireflyBot
-import com.fireflybot.telegram.wizard.WizardHandler
-import com.fireflybot.telegram.wizard.WizardSessionStore
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -42,8 +50,29 @@ val appModule = module {
         }
     }
 
-    single { FireflyClient(get(), get()) }
-    single { WizardSessionStore() }
-    single { WizardHandler(get()) }
-    single { FireflyBot(get(), get(), get()) }
+    // ── Outbound adapters ─────────────────────────────────────────────────────
+
+    single<WizardSessionRepository> { InMemoryWizardSessionRepository() }
+    single<AccountRepository> { MockAccountAdapter() }
+    single<CategoryRepository> { MockCategoryAdapter() }
+    // Use MockTransactionAdapter until real Firefly API wiring is complete.
+    // To switch to real calls, replace with: FireflyTransactionAdapter(get(), get())
+    single<TransactionRepository> { MockTransactionAdapter() }
+
+    // ── Application ───────────────────────────────────────────────────────────
+
+    single {
+        WizardService(
+            sessionRepository = get(),
+            accountRepository = get(),
+            categoryRepository = get(),
+            transactionRepository = get(),
+            tags = MockData.tags,
+        )
+    }
+
+    // ── Inbound adapters ──────────────────────────────────────────────────────
+
+    single { TelegramWizardPresenter() }
+    single { FireflyBot(get(), get<WizardService>(), get()) }
 }
