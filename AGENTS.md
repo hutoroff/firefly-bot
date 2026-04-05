@@ -16,7 +16,7 @@ Also verify the fat JAR compiles:
 JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle shadowJar --no-daemon
 ```
 
-A successful build produces `build/libs/firefly-bot-1.0.1.jar`. **Do not declare a task
+A successful build produces `build/libs/firefly-bot-1.0.0.jar`. **Do not declare a task
 done until all tests pass and the build is clean.**
 
 ## Testing rules
@@ -147,3 +147,13 @@ Gradle commands with `JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.
 The Dockerfile is a two-stage build. The builder stage uses the Gradle image (no wrapper
 needed); the runtime stage uses a minimal JRE. The `.dockerignore` excludes `.env`,
 `build/`, and `.git` — do not remove these exclusions.
+
+Two Compose files are provided:
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Builds the image from source (`build: .`). Used for local development. |
+| `docker-compose.hub.yml` | Pulls a pre-built image from Docker Hub. Used for production deployments. Requires `FIREFLY_BOT_IMAGE` to be set in `.env` (e.g. `<dockerhub-username>/firefly-bot:1.2.3`). Uses required-variable syntax — Compose will fail with a clear message if `FIREFLY_BOT_IMAGE` is unset. |
+
+The release workflow (`release.yml`) pushes both a versioned tag and `latest` to Docker Hub.
+The exact `docker pull` command for each release is printed in the GitHub Release notes.

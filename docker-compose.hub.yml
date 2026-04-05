@@ -1,0 +1,18 @@
+# docker-compose.hub.yml — pulls the published image from Docker Hub.
+#
+# Usage:
+#   docker compose -f docker-compose.hub.yml up -d
+#
+# Set FIREFLY_BOT_IMAGE in your .env (or in the environment) to pin a specific
+# version, e.g. FIREFLY_BOT_IMAGE=<dockerhub-username>/firefly-bot:1.2.3
+# The exact image name for each release is shown on the GitHub Releases page.
+
+services:
+  firefly-bot:
+    image: ${FIREFLY_BOT_IMAGE:?Set FIREFLY_BOT_IMAGE in .env — see .env.example for the format}
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    environment:
+      SESSION_FILE_PATH: /app/data/sessions.json

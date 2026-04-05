@@ -53,15 +53,15 @@ The bot is a single Docker container with no exposed ports (it uses Telegram lon
 
 ### 1. Get the files onto the server
 
-**Option A — clone the repository** (builds the image from source):
+**Option A — pull the pre-built image from Docker Hub** (recommended for production):
+
+Download `docker-compose.hub.yml` and `.env.example` from the repository.
+
+**Option B — clone the repository** (builds the image from source):
 ```bash
 git clone <repo-url>
 cd firefly_bot
 ```
-
-**Option B — download only two files** (uses the pre-built image from Docker Hub):
-
-Download `docker-compose.yml` and `.env.example` from the repository, then replace the `build: .` key in `docker-compose.yml` with the published image tag listed on the [GitHub Releases page](../../releases).
 
 ### 2. Create the env file
 
@@ -70,14 +70,21 @@ cp .env.example .env
 # Edit .env with production values (never commit this file)
 ```
 
+For **Option A**, also set `FIREFLY_BOT_IMAGE` in `.env` to the image published for this release.
+The exact image name is shown on the [GitHub Releases page](../../releases), e.g.:
+
+```
+FIREFLY_BOT_IMAGE=<dockerhub-username>/firefly-bot:1.2.3
+```
+
 ### 3. Start the bot in the background
 
 ```bash
-# Option A (build from source):
-docker compose up -d --build
+# Option A (pre-built image from Docker Hub):
+docker compose -f docker-compose.hub.yml up -d
 
-# Option B (pre-built image):
-docker compose up -d
+# Option B (build from source):
+docker compose up -d --build
 ```
 
 The bot starts polling Telegram immediately. Wizard sessions are persisted to `./data/sessions.json` on the host (Docker bind-mounts it to `/app/data/sessions.json` inside the container). The `data/` directory is created automatically.
@@ -85,22 +92,28 @@ The bot starts polling Telegram immediately. Wizard sessions are persisted to `.
 ### 4. Verify it is running
 
 ```bash
-docker compose ps          # should show firefly-bot as "running"
-docker compose logs -f     # stream logs; Ctrl-C to stop tailing
+# Option A:
+docker compose -f docker-compose.hub.yml ps
+docker compose -f docker-compose.hub.yml logs -f
+
+# Option B:
+docker compose ps
+docker compose logs -f
 ```
 
 ### Updating to a new version
 
-**Option A (built from source):**
+**Option A (pre-built image):**
+```bash
+# Update FIREFLY_BOT_IMAGE in .env to the new version tag, then:
+docker compose -f docker-compose.hub.yml pull
+docker compose -f docker-compose.hub.yml up -d
+```
+
+**Option B (built from source):**
 ```bash
 git pull
 docker compose up -d --build    # rebuilds the image and recreates the container
-```
-
-**Option B (pre-built image):**
-```bash
-docker compose pull             # fetches the new image from Docker Hub
-docker compose up -d            # recreates the container with the new image
 ```
 
 Sessions are preserved across updates via the `./data` volume.
@@ -108,8 +121,14 @@ Sessions are preserved across updates via the `./data` volume.
 ### Stopping the bot
 
 ```bash
-docker compose down    # stops and removes the container; data/ volume is untouched
+# Option A (pre-built image):
+docker compose -f docker-compose.hub.yml down
+
+# Option B (built from source):
+docker compose down
 ```
+
+Both commands stop and remove the container; the `data/` volume is untouched.
 
 ## Running locally (development)
 
@@ -119,7 +138,7 @@ JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home ./grad
 
 # Load env vars from .env, then run
 export $(grep -v '^#' .env | xargs)
-java -jar build/libs/firefly-bot-1.0.1.jar
+java -jar build/libs/firefly-bot-1.0.0.jar
 ```
 
 ## Usage

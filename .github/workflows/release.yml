@@ -2,8 +2,10 @@ name: Release
 
 # Manually triggered release workflow.
 #
-# Required repository secrets (Settings → Secrets and variables → Actions):
+# Required repository variable (Settings → Secrets and variables → Actions → Variables):
 #   DOCKERHUB_USERNAME  – Docker Hub account name
+#
+# Required repository secret (Settings → Secrets and variables → Actions → Secrets):
 #   DOCKERHUB_TOKEN     – Docker Hub access token (read/write access to the repo)
 #
 # Optional secret (needed only when the main branch has required-review push
@@ -124,7 +126,7 @@ jobs:
       - name: Run tests and generate coverage report
         run: gradle test jacocoTestReport --no-daemon
 
-      - name: Enforce 85 % instruction-coverage floor
+      - name: Enforce 75 % instruction-coverage floor
         run: gradle jacocoTestCoverageVerification --no-daemon
 
       # ── Assemble release notes ─────────────────────────────────────────────
@@ -146,10 +148,10 @@ jobs:
             echo "## Docker Image"
             echo ""
             echo '```'
-            echo "docker pull ${{ secrets.DOCKERHUB_USERNAME }}/firefly-bot:${{ steps.ver.outputs.new }}"
+            echo "docker pull ${{ vars.DOCKERHUB_USERNAME }}/firefly-bot:${{ steps.ver.outputs.new }}"
             echo '```'
             echo ""
-            echo "Full image history: https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/firefly-bot/tags"
+            echo "Full image history: https://hub.docker.com/r/${{ vars.DOCKERHUB_USERNAME }}/firefly-bot/tags"
           } > changelog.md
 
       # ── Commit version bump, create annotated tag, push ───────────────────
@@ -161,7 +163,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add -u   # stage every tracked file that was modified above
-          git commit -m "chore: bump version to ${{ steps.ver.outputs.new }}"
+          git commit -m "[chore] bump version to ${{ steps.ver.outputs.new }}"
 
           git tag -a "${{ steps.ver.outputs.tag }}" \
                   -m "Release ${{ steps.ver.outputs.tag }}"
@@ -186,7 +188,7 @@ jobs:
           push: true
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/firefly-bot:${{ steps.ver.outputs.new }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/firefly-bot:latest
+            ${{ vars.DOCKERHUB_USERNAME }}/firefly-bot:latest
 
       # ── Publish the GitHub Release ─────────────────────────────────────────
       - name: Create GitHub release

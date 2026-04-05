@@ -17,6 +17,7 @@ on:
 
 jobs:
   ci:
+    name: Build and test
     runs-on: ubuntu-latest
 
     permissions:
