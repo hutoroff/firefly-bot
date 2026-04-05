@@ -9,7 +9,7 @@ Instructions for Claude Code when working on this repository.
 JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle shadowJar --no-daemon
 
 # Run locally (requires .env exported or env vars set)
-java -jar build/libs/firefly-bot-1.0.1.jar
+java -jar build/libs/firefly-bot-1.0.0.jar
 
 # Docker
 docker compose up --build
