@@ -1,6 +1,6 @@
 package com.fireflybot.application.wizard
 
-import com.fireflybot.adapter.out.mock.InMemoryWizardSessionRepository
+import com.fireflybot.adapter.out.persistence.JsonFileWizardSessionRepository
 import com.fireflybot.application.port.out.AccountRepository
 import com.fireflybot.application.port.out.CategoryRepository
 import com.fireflybot.application.port.out.TagRepository
@@ -15,6 +15,8 @@ import io.mockk.verify
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Path
 
 class WizardServiceWithdrawalTest {
 
@@ -34,17 +36,20 @@ class WizardServiceWithdrawalTest {
         Category("cat2", "Transport"),
     )
 
+    @TempDir
+    lateinit var tempDir: Path
+
     private val accountRepo = mockk<AccountRepository>()
     private val categoryRepo = mockk<CategoryRepository>()
     private val txRepo = mockk<TransactionRepository>()
     private val tagRepo = mockk<TagRepository>()
-    private val sessionRepo = InMemoryWizardSessionRepository()
-    private val service = WizardService(
-        sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo,
-    )
+    private lateinit var sessionRepo: JsonFileWizardSessionRepository
+    private lateinit var service: WizardService
 
     @BeforeEach
     fun setUp() {
+        sessionRepo = JsonFileWizardSessionRepository(tempDir.resolve("sessions.json").toString())
+        service = WizardService(sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo)
         every { accountRepo.getAssetAccounts() } returns assetAccounts
         every { accountRepo.searchExpenseAccounts(any()) } returns expenseAccounts
         every { accountRepo.searchExpenseAccounts("grocery") } returns listOf(usdExpenseAccount)

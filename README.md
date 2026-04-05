@@ -183,8 +183,7 @@ Telegram update
       │
   FireflyAccountAdapter / FireflyCategoryAdapter / FireflyTagAdapter
   FireflyTransactionAdapter ──▶ Firefly III REST API
-  JsonFileWizardSessionRepository ──▶ sessions.json  (production)
-  InMemoryWizardSessionRepository                    (tests only)
+  JsonFileWizardSessionRepository ──▶ sessions.json  (production + tests via @TempDir)
 ```
 
 ## Project structure
@@ -226,9 +225,6 @@ src/main/kotlin/com/fireflybot/
     dto/                                Serialization DTOs for all Firefly III responses
 
   adapter/out/persistence/
-    JsonFileWizardSessionRepository.kt  Implements WizardSessionRepository (JSON file, production)
+    JsonFileWizardSessionRepository.kt  Implements WizardSessionRepository (JSON file, production + tests)
     WizardSessionDto.kt                 Flat serializable DTO for session persistence
-
-  adapter/out/mock/
-    InMemoryWizardSessionRepository.kt  Implements WizardSessionRepository (ConcurrentHashMap, tests only)
 ```

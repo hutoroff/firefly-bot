@@ -1,6 +1,6 @@
 package com.fireflybot.application.wizard
 
-import com.fireflybot.adapter.out.mock.InMemoryWizardSessionRepository
+import com.fireflybot.adapter.out.persistence.JsonFileWizardSessionRepository
 import com.fireflybot.application.port.out.AccountRepository
 import com.fireflybot.application.port.out.CategoryRepository
 import com.fireflybot.application.port.out.TagRepository
@@ -13,6 +13,8 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Path
 
 /**
  * Tests for session lifecycle, common callback routing, date/time input, and tag selection.
@@ -28,17 +30,20 @@ class WizardServiceCommonTest {
     )
     private val categories = listOf(Category("c1", "Food"))
 
+    @TempDir
+    lateinit var tempDir: Path
+
     private val accountRepo = mockk<AccountRepository>()
     private val categoryRepo = mockk<CategoryRepository>()
     private val txRepo = mockk<TransactionRepository>()
     private val tagRepo = mockk<TagRepository>()
-    private val sessionRepo = InMemoryWizardSessionRepository()
-    private val service = WizardService(
-        sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo,
-    )
+    private lateinit var sessionRepo: JsonFileWizardSessionRepository
+    private lateinit var service: WizardService
 
     @BeforeEach
     fun setUp() {
+        sessionRepo = JsonFileWizardSessionRepository(tempDir.resolve("sessions.json").toString())
+        service = WizardService(sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo)
         every { accountRepo.getAssetAccounts() } returns accounts
         every { categoryRepo.getCategories() } returns categories
         every { txRepo.createTransaction(any()) } returns "tx-id"
