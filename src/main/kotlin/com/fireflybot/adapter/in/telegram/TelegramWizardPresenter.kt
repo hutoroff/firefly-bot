@@ -125,13 +125,36 @@ class TelegramWizardPresenter(private val pageSize: Int = 5) {
     }
 
     private fun renderPreview(bot: TelegramLongPollingBot, chatId: Long, messageId: Int?, session: WizardSession) {
-        val tagLabel = if (session.tag != null) "Change tag" else "Add tag"
-        val keyboard = inlineKeyboard(listOf(
-            listOf(button("Change date/time", "pv:dt")),
-            listOf(button(tagLabel, "pv:tag")),
-            listOf(button("Submit", "pv:sub")),
-        ))
-        edit(bot, chatId, messageId, buildPreviewText(session), keyboard)
+        val rows = mutableListOf<List<InlineKeyboardButton>>()
+        when (session.transactionType) {
+            TransactionType.TRANSFER -> {
+                rows += listOf(button("Change source account", "pv:sa"))
+                rows += listOf(button("Change destination account", "pv:da"))
+                if (session.amount != null) {
+                    rows += listOf(button("Change amount", "pv:amt"))
+                } else {
+                    rows += listOf(button("Change source amount", "pv:samt"))
+                    rows += listOf(button("Change dest amount", "pv:damt"))
+                }
+            }
+            TransactionType.WITHDRAWAL -> {
+                rows += listOf(button("Change source account", "pv:sa"))
+                rows += listOf(button("Change expense account", "pv:ea"))
+                rows += listOf(button("Change amount", "pv:amt"))
+                rows += listOf(button("Change category", "pv:cat"))
+            }
+            TransactionType.DEPOSIT -> {
+                rows += listOf(button("Change destination account", "pv:da"))
+                rows += listOf(button("Change revenue account", "pv:ra"))
+                rows += listOf(button("Change amount", "pv:amt"))
+                rows += listOf(button("Change category", "pv:cat"))
+            }
+            null -> {}
+        }
+        rows += listOf(button("Change date/time", "pv:dt"))
+        rows += listOf(button(if (session.tag != null) "Change tag" else "Add tag", "pv:tag"))
+        rows += listOf(button("Submit", "pv:sub"))
+        edit(bot, chatId, messageId, buildPreviewText(session), inlineKeyboard(rows))
     }
 
     private fun buildPreviewText(session: WizardSession): String = buildString {

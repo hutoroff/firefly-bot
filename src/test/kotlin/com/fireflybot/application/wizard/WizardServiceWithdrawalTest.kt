@@ -366,4 +366,62 @@ class WizardServiceWithdrawalTest {
         val result = service.handleCallback(chatId, messageId, "pv:sub") as WizardResult.WizardComplete
         assertTrue(result.summary.contains("Withdrawal submitted successfully!"))
     }
+
+    // ── Preview field editing ─────────────────────────────────────────────────
+
+    private fun driveToPreview(): WizardResult {
+        service.startNewWizard(chatId)
+        service.handleCallback(chatId, messageId, "t:withdrawal")
+        service.handleCallback(chatId, messageId, "sa:src1")
+        service.handleText(chatId, "grocery")
+        service.handleCallback(chatId, messageId, "ea:exp1")
+        service.handleText(chatId, "55.00")
+        return service.handleCallback(chatId, messageId, "cat:cat1")
+    }
+
+    @Test
+    fun `pv-sa from withdrawal preview returns source account list and sets SelectSourceAccount step`() {
+        driveToPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:sa")
+        assertTrue(result is WizardResult.ShowAccountList)
+        assertEquals("sa", (result as WizardResult.ShowAccountList).selectPrefix)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.SelectSourceAccount)
+    }
+
+    @Test
+    fun `pv-ea from withdrawal preview prompts for expense account query and sets EnterExpenseAccountQuery step`() {
+        driveToPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:ea")
+        assertTrue(result is WizardResult.ShowTextPrompt)
+        assertTrue((result as WizardResult.ShowTextPrompt).prompt.lowercase().contains("expense"))
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.EnterExpenseAccountQuery)
+    }
+
+    @Test
+    fun `pv-amt from withdrawal preview prompts for amount and sets EnterAmount step`() {
+        driveToPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:amt")
+        assertTrue(result is WizardResult.ShowTextPrompt)
+        assertTrue((result as WizardResult.ShowTextPrompt).prompt.contains("USD"))
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.EnterAmount)
+    }
+
+    @Test
+    fun `pv-amt then new amount returns preview directly when category already set`() {
+        driveToPreview()
+        service.handleCallback(chatId, messageId, "pv:amt")
+        val result = service.handleText(chatId, "70.00")
+        assertTrue(result is WizardResult.ShowPreview)
+        val session = (result as WizardResult.ShowPreview).session
+        assertEquals("70.00", session.amount)
+        assertEquals("cat1", session.category?.id) // category preserved
+    }
+
+    @Test
+    fun `pv-cat from withdrawal preview returns category list and sets SelectCategory step`() {
+        driveToPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:cat")
+        assertTrue(result is WizardResult.ShowCategoryList)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.SelectCategory)
+    }
 }

@@ -148,6 +148,9 @@ class WizardService(
                     step = WizardStep.SelectDestinationAccount,
                     sourceAccount = account,
                     accountPage = 0,
+                    amount = null,
+                    sourceAmount = null,
+                    destAmount = null,
                 )
                 sessionRepository.save(updated)
                 buildDestAccountList(updated, "Select destination account:")
@@ -193,7 +196,13 @@ class WizardService(
             TransactionType.TRANSFER -> {
                 val sameCurrency = session.sourceAccount?.currencyCode == account.currencyCode
                 val nextStep = if (sameCurrency) WizardStep.EnterAmount else WizardStep.EnterSourceAmount
-                val updated = session.copy(step = nextStep, destinationAccount = account)
+                val updated = session.copy(
+                    step = nextStep,
+                    destinationAccount = account,
+                    amount = null,
+                    sourceAmount = null,
+                    destAmount = null,
+                )
                 sessionRepository.save(updated)
                 buildAmountPrompt(updated)
             }
@@ -366,9 +375,16 @@ class WizardService(
         return if (session.transactionType == TransactionType.WITHDRAWAL ||
             session.transactionType == TransactionType.DEPOSIT
         ) {
-            val updated = withAmount.copy(step = WizardStep.SelectCategory, accountPage = 0)
-            sessionRepository.save(updated)
-            buildCategoryList(updated)
+            if (session.category != null) {
+                // Returning from preview — category already chosen, skip re-selection.
+                val updated = withAmount.copy(step = WizardStep.Preview)
+                sessionRepository.save(updated)
+                WizardResult.ShowPreview(updated)
+            } else {
+                val updated = withAmount.copy(step = WizardStep.SelectCategory, accountPage = 0)
+                sessionRepository.save(updated)
+                buildCategoryList(updated)
+            }
         } else {
             val updated = withAmount.copy(step = WizardStep.Preview)
             sessionRepository.save(updated)
@@ -379,9 +395,17 @@ class WizardService(
     private fun handleSourceAmountInput(session: WizardSession, text: String): WizardResult {
         val amount = parseAmount(text)
             ?: return WizardResult.ShowTextPrompt("Invalid amount. Enter a positive number (e.g. 100.50):")
-        val updated = session.copy(step = WizardStep.EnterDestAmount, sourceAmount = amount)
-        sessionRepository.save(updated)
-        return WizardResult.ShowTextPrompt("Enter deposit amount in ${session.destinationAccount?.currencyCode}:")
+        val withSourceAmount = session.copy(sourceAmount = amount)
+        return if (session.destAmount != null) {
+            // Returning from preview (pv:samt) — dest amount already set, skip re-entry.
+            val updated = withSourceAmount.copy(step = WizardStep.Preview)
+            sessionRepository.save(updated)
+            WizardResult.ShowPreview(updated)
+        } else {
+            val updated = withSourceAmount.copy(step = WizardStep.EnterDestAmount)
+            sessionRepository.save(updated)
+            WizardResult.ShowTextPrompt("Enter deposit amount in ${session.destinationAccount?.currencyCode}:")
+        }
     }
 
     private fun handleDestAmountInput(session: WizardSession, text: String): WizardResult {
@@ -429,6 +453,44 @@ class WizardService(
             WizardResult.ShowTagList(tagRepository.getTags())
         }
         "sub" -> if (session.step is WizardStep.Preview) handleSubmit(session) else WizardResult.NoOp
+        "sa" -> {
+            val updated = session.copy(step = WizardStep.SelectSourceAccount, accountPage = 0)
+            sessionRepository.save(updated)
+            buildSourceAccountList(updated, "Select source account:")
+        }
+        "da" -> {
+            val updated = session.copy(step = WizardStep.SelectDestinationAccount, accountPage = 0)
+            sessionRepository.save(updated)
+            buildDestAccountList(updated, "Select destination account:")
+        }
+        "ea" -> {
+            sessionRepository.save(session.copy(step = WizardStep.EnterExpenseAccountQuery))
+            WizardResult.ShowTextPrompt("Enter part of the expense account name to search:")
+        }
+        "ra" -> {
+            sessionRepository.save(session.copy(step = WizardStep.EnterRevenueAccountQuery))
+            WizardResult.ShowTextPrompt("Enter part of the revenue account name to search:")
+        }
+        "amt" -> {
+            val updated = session.copy(step = WizardStep.EnterAmount)
+            sessionRepository.save(updated)
+            buildAmountPrompt(updated)
+        }
+        "samt" -> {
+            val updated = session.copy(step = WizardStep.EnterSourceAmount)
+            sessionRepository.save(updated)
+            buildAmountPrompt(updated)
+        }
+        "damt" -> {
+            val updated = session.copy(step = WizardStep.EnterDestAmount)
+            sessionRepository.save(updated)
+            WizardResult.ShowTextPrompt("Enter deposit amount in ${session.destinationAccount?.currencyCode}:")
+        }
+        "cat" -> {
+            val updated = session.copy(step = WizardStep.SelectCategory, accountPage = 0)
+            sessionRepository.save(updated)
+            buildCategoryList(updated)
+        }
         else -> WizardResult.NoOp
     }
 

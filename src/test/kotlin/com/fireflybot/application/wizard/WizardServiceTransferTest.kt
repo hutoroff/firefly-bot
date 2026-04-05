@@ -333,6 +333,169 @@ class WizardServiceTransferTest {
         assertTrue(result.summary.contains("Transfer submitted successfully!"))
     }
 
+    // ── Preview field editing ─────────────────────────────────────────────────
+
+    private fun driveToSameCurrencyPreview(): WizardResult {
+        service.startNewWizard(chatId)
+        service.handleCallback(chatId, messageId, "t:transfer")
+        service.handleCallback(chatId, messageId, "sa:1")
+        service.handleCallback(chatId, messageId, "da:2")
+        return service.handleText(chatId, "150.00")
+    }
+
+    private fun driveToCrossCurrencyPreview(): WizardResult {
+        service.startNewWizard(chatId)
+        service.handleCallback(chatId, messageId, "t:transfer")
+        service.handleCallback(chatId, messageId, "sa:1")  // USD
+        service.handleCallback(chatId, messageId, "da:3")  // EUR
+        service.handleText(chatId, "100.00")
+        return service.handleText(chatId, "92.00")
+    }
+
+    @Test
+    fun `pv-sa from preview returns source account list and sets SelectSourceAccount step`() {
+        driveToSameCurrencyPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:sa")
+        assertTrue(result is WizardResult.ShowAccountList)
+        assertEquals("sa", (result as WizardResult.ShowAccountList).selectPrefix)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.SelectSourceAccount)
+    }
+
+    @Test
+    fun `pv-da from preview returns destination account list and sets SelectDestinationAccount step`() {
+        driveToSameCurrencyPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:da")
+        assertTrue(result is WizardResult.ShowAccountList)
+        assertEquals("da", (result as WizardResult.ShowAccountList).selectPrefix)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.SelectDestinationAccount)
+    }
+
+    @Test
+    fun `pv-amt from same-currency preview prompts for new amount and sets EnterAmount step`() {
+        driveToSameCurrencyPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:amt")
+        assertTrue(result is WizardResult.ShowTextPrompt)
+        assertTrue((result as WizardResult.ShowTextPrompt).prompt.contains("USD"))
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.EnterAmount)
+    }
+
+    @Test
+    fun `pv-amt then new amount returns preview directly for transfer`() {
+        driveToSameCurrencyPreview()
+        service.handleCallback(chatId, messageId, "pv:amt")
+        val result = service.handleText(chatId, "200.00")
+        assertTrue(result is WizardResult.ShowPreview)
+        assertEquals("200.00", (result as WizardResult.ShowPreview).session.amount)
+    }
+
+    @Test
+    fun `pv-samt from cross-currency preview prompts for source amount and sets EnterSourceAmount step`() {
+        driveToCrossCurrencyPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:samt")
+        assertTrue(result is WizardResult.ShowTextPrompt)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.EnterSourceAmount)
+    }
+
+    @Test
+    fun `pv-samt then new source amount returns preview directly skipping dest amount re-entry`() {
+        driveToCrossCurrencyPreview()
+        service.handleCallback(chatId, messageId, "pv:samt")
+        val result = service.handleText(chatId, "110.00")
+        assertTrue(result is WizardResult.ShowPreview)
+        val session = (result as WizardResult.ShowPreview).session
+        assertEquals("110.00", session.sourceAmount)
+        assertEquals("92.00", session.destAmount) // old dest amount preserved
+    }
+
+    @Test
+    fun `pv-damt from cross-currency preview prompts for dest amount and sets EnterDestAmount step`() {
+        driveToCrossCurrencyPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:damt")
+        assertTrue(result is WizardResult.ShowTextPrompt)
+        assertTrue((result as WizardResult.ShowTextPrompt).prompt.contains("EUR"))
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.EnterDestAmount)
+    }
+
+    @Test
+    fun `pv-damt then new dest amount returns preview`() {
+        driveToCrossCurrencyPreview()
+        service.handleCallback(chatId, messageId, "pv:damt")
+        val result = service.handleText(chatId, "95.00")
+        assertTrue(result is WizardResult.ShowPreview)
+        assertEquals("95.00", (result as WizardResult.ShowPreview).session.destAmount)
+    }
+
+    @Test
+    fun `pv-sa then selecting new source advances to destination account selection`() {
+        driveToSameCurrencyPreview()
+        service.handleCallback(chatId, messageId, "pv:sa")
+        val result = service.handleCallback(chatId, messageId, "sa:2")
+        assertTrue(result is WizardResult.ShowAccountList)
+        assertEquals("da", (result as WizardResult.ShowAccountList).selectPrefix)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.SelectDestinationAccount)
+    }
+
+    // ── Stale-amount clearing on account change ───────────────────────────────
+
+    @Test
+    fun `selecting new source clears all amount fields`() {
+        driveToSameCurrencyPreview() // amount = "150.00"
+        service.handleCallback(chatId, messageId, "pv:sa")
+        service.handleCallback(chatId, messageId, "sa:2") // new source
+        val session = sessionRepo.get(chatId)!!
+        assertNull(session.amount)
+        assertNull(session.sourceAmount)
+        assertNull(session.destAmount)
+    }
+
+    @Test
+    fun `selecting new destination clears all amount fields`() {
+        driveToSameCurrencyPreview() // amount = "150.00"
+        service.handleCallback(chatId, messageId, "pv:da")
+        service.handleCallback(chatId, messageId, "da:2") // same dest — amounts cleared anyway
+        val session = sessionRepo.get(chatId)!!
+        assertNull(session.amount)
+        assertNull(session.sourceAmount)
+        assertNull(session.destAmount)
+    }
+
+    @Test
+    fun `switching same-currency to cross-currency via pv-da clears amount and sets EnterSourceAmount`() {
+        driveToSameCurrencyPreview() // USD→USD, amount="150.00"
+        service.handleCallback(chatId, messageId, "pv:da")
+        service.handleCallback(chatId, messageId, "da:3") // EUR — cross-currency
+        val session = sessionRepo.get(chatId)!!
+        assertTrue(session.step is WizardStep.EnterSourceAmount)
+        assertNull(session.amount)
+        assertNull(session.sourceAmount)
+        assertNull(session.destAmount)
+    }
+
+    @Test
+    fun `switching cross-currency to same-currency via pv-da clears source and dest amounts`() {
+        driveToCrossCurrencyPreview() // USD→EUR, sourceAmount="100.00", destAmount="92.00"
+        service.handleCallback(chatId, messageId, "pv:da")
+        service.handleCallback(chatId, messageId, "da:2") // USD — same-currency
+        val session = sessionRepo.get(chatId)!!
+        assertTrue(session.step is WizardStep.EnterAmount)
+        assertNull(session.amount)
+        assertNull(session.sourceAmount)
+        assertNull(session.destAmount)
+    }
+
+    @Test
+    fun `pv-da then cross-currency dest forces fresh source and dest amount entry`() {
+        driveToCrossCurrencyPreview() // destAmount="92.00"
+        service.handleCallback(chatId, messageId, "pv:da")
+        service.handleCallback(chatId, messageId, "da:3") // EUR again — amounts cleared
+        service.handleText(chatId, "105.00") // new source amount
+        // destAmount was cleared by Fix 1b, so shortcut must NOT trigger
+        val session = sessionRepo.get(chatId)!!
+        assertTrue(session.step is WizardStep.EnterDestAmount)
+        assertEquals("105.00", session.sourceAmount)
+        assertNull(session.destAmount)
+    }
+
     @Test
     fun `submit with tag preserves tag in created transaction`() {
         service.startNewWizard(chatId)

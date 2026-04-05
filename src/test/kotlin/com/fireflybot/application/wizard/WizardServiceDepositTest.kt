@@ -345,4 +345,62 @@ class WizardServiceDepositTest {
         assertTrue(result is WizardResult.ShowTextPrompt)
         assertTrue((result as WizardResult.ShowTextPrompt).prompt.contains("EUR"))
     }
+
+    // ── Preview field editing ─────────────────────────────────────────────────
+
+    private fun driveToPreview(): WizardResult {
+        service.startNewWizard(chatId)
+        service.handleCallback(chatId, messageId, "t:deposit")
+        service.handleCallback(chatId, messageId, "da:dst1")
+        service.handleText(chatId, "employer")
+        service.handleCallback(chatId, messageId, "ra:rev1")
+        service.handleText(chatId, "2000.00")
+        return service.handleCallback(chatId, messageId, "cat:cat1")
+    }
+
+    @Test
+    fun `pv-da from deposit preview returns destination account list and sets SelectDestinationAccount step`() {
+        driveToPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:da")
+        assertTrue(result is WizardResult.ShowAccountList)
+        assertEquals("da", (result as WizardResult.ShowAccountList).selectPrefix)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.SelectDestinationAccount)
+    }
+
+    @Test
+    fun `pv-ra from deposit preview prompts for revenue account query and sets EnterRevenueAccountQuery step`() {
+        driveToPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:ra")
+        assertTrue(result is WizardResult.ShowTextPrompt)
+        assertTrue((result as WizardResult.ShowTextPrompt).prompt.lowercase().contains("revenue"))
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.EnterRevenueAccountQuery)
+    }
+
+    @Test
+    fun `pv-amt from deposit preview prompts for amount and sets EnterAmount step`() {
+        driveToPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:amt")
+        assertTrue(result is WizardResult.ShowTextPrompt)
+        assertTrue((result as WizardResult.ShowTextPrompt).prompt.contains("USD"))
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.EnterAmount)
+    }
+
+    @Test
+    fun `pv-amt then new amount returns preview directly when category already set`() {
+        driveToPreview()
+        service.handleCallback(chatId, messageId, "pv:amt")
+        val result = service.handleText(chatId, "2500.00")
+        assertTrue(result is WizardResult.ShowPreview)
+        val session = (result as WizardResult.ShowPreview).session
+        assertEquals("2500.00", session.amount)
+        assertEquals("cat1", session.category?.id) // category preserved
+    }
+
+    @Test
+    fun `pv-cat from deposit preview returns category list and sets SelectCategory step`() {
+        driveToPreview()
+        val result = service.handleCallback(chatId, messageId, "pv:cat")
+        assertTrue(result is WizardResult.ShowCategoryList)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.SelectCategory)
+    }
 }
