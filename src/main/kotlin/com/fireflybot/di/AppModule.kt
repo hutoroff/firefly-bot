@@ -6,7 +6,7 @@ import com.fireflybot.adapter.out.firefly.FireflyAccountAdapter
 import com.fireflybot.adapter.out.firefly.FireflyCategoryAdapter
 import com.fireflybot.adapter.out.firefly.FireflyTagAdapter
 import com.fireflybot.adapter.out.firefly.FireflyTransactionAdapter
-import com.fireflybot.adapter.out.mock.InMemoryWizardSessionRepository
+import com.fireflybot.adapter.out.persistence.JsonFileWizardSessionRepository
 import com.fireflybot.application.port.out.AccountRepository
 import com.fireflybot.application.port.out.CategoryRepository
 import com.fireflybot.application.port.out.TagRepository
@@ -53,7 +53,7 @@ val appModule = module {
 
     // ── Outbound adapters ─────────────────────────────────────────────────────
 
-    single<WizardSessionRepository> { InMemoryWizardSessionRepository() }
+    single<WizardSessionRepository> { JsonFileWizardSessionRepository(get<AppConfig>().sessionFilePath) }
     single<AccountRepository> { FireflyAccountAdapter(get(), get()) }
     single<CategoryRepository> { FireflyCategoryAdapter(get(), get()) }
     single<TransactionRepository> { FireflyTransactionAdapter(get(), get()) }

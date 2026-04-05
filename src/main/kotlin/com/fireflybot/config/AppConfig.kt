@@ -6,6 +6,7 @@ data class AppConfig(
     val telegramAllowedUserId: Long,
     val fireflyHost: String,
     val fireflyToken: String,
+    val sessionFilePath: String,
 ) {
     companion object {
         fun fromEnv(): AppConfig = AppConfig(
@@ -15,6 +16,7 @@ data class AppConfig(
                 ?: error("Required environment variable 'TELEGRAM_ALLOWED_USER_ID' must be a valid Telegram user id"),
             fireflyHost = requireEnv("FIREFLY_HOST"),
             fireflyToken = requireEnv("FIREFLY_TOKEN"),
+            sessionFilePath = System.getenv("SESSION_FILE_PATH")?.trim()?.takeIf { it.isNotEmpty() } ?: "sessions.json",
         )
 
         private fun requireEnv(name: String): String =

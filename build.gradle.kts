@@ -92,6 +92,14 @@ tasks.jacocoTestCoverageVerification {
                 }
             }
         }
+        rule {
+            includes = listOf("com.fireflybot.adapter.out.persistence.*")
+            limit {
+                counter = "INSTRUCTION"
+                value = "COVEREDRATIO"
+                minimum = "0.75".toBigDecimal()
+            }
+        }
     }
 }
 

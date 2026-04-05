@@ -3,3 +3,7 @@ services:
     build: .
     env_file: .env
     restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    environment:
+      SESSION_FILE_PATH: /app/data/sessions.json
