@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_coverage_regression:
+        description: >
+          Skip the coverage-regression check. Use when a coverage decrease is
+          intentional (e.g. deleting a feature together with its tests).
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      actions: read   # required to query and download artifacts from past runs
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # setup-java installs JDK 21 and sets JAVA_HOME automatically.
+      # No manual JAVA_HOME prefix is needed in CI (unlike the local dev machine
+      # where the system JDK is 25 and Kotlin 2.0.21 requires 21).
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: gradle
+
+      # ── Build ─────────────────────────────────────────────────────────────────
+      - name: Build fat JAR
+        run: gradle shadowJar --no-daemon
+
+      # ── Test + coverage report ────────────────────────────────────────────────
+      - name: Run tests and generate coverage report
+        run: gradle test jacocoTestReport --no-daemon
+
+      # Fails the build when any watched package drops below 85 %.
+      - name: Enforce 85 % instruction-coverage floor
+        run: gradle jacocoTestCoverageVerification --no-daemon
+
+      # ── Persist baseline after every green push to main ───────────────────────
+      - name: Upload coverage baseline
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-baseline
+          path: build/reports/jacoco/test/jacocoTestReport.xml
+          retention-days: 90
+          overwrite: true
+
+      # ── Regression check (PRs only) ───────────────────────────────────────────
+      #
+      # Compares per-package instruction coverage against the baseline stored by
+      # the last successful CI run on the target branch.  The step is a no-op
+      # when no baseline exists yet (first run) or when the skip input is set.
+
+      - name: Download coverage baseline from last successful run on target branch
+        id: get-baseline
+        if: github.event_name == 'pull_request' && inputs.skip_coverage_regression != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --branch "${{ github.base_ref }}" \
+            --workflow "ci.yml" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+
+          if [ -z "$RUN_ID" ]; then
+            echo "No successful baseline run on '${{ github.base_ref }}' yet — skipping regression check"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          else
+            gh run download "$RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name coverage-baseline \
+              --dir coverage-baseline
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+        continue-on-error: true
+
+      - name: Check coverage has not decreased
+        if: >-
+          github.event_name == 'pull_request' &&
+          inputs.skip_coverage_regression != 'true' &&
+          steps.get-baseline.outputs.found == 'true'
+        run: |
+          python3 - << 'EOF'
+          import xml.etree.ElementTree as ET, sys
+
+          WATCHED = ('domain/model', 'application/wizard', 'adapter/out/mock')
+
+          def parse(path):
+              tree = ET.parse(path)
+              root = tree.getroot()
+              out = {}
+              for pkg in root.findall('package'):
+                  name = pkg.get('name')
+                  if not any(s in name for s in WATCHED):
+                      continue
+                  for c in pkg.findall('counter'):
+                      if c.get('type') == 'INSTRUCTION':
+                          missed = int(c.get('missed'))
+                          covered = int(c.get('covered'))
+                          total = missed + covered
+                          out[name] = round(covered / total * 100, 1) if total else 0.0
+              return out
+
+          baseline = parse('coverage-baseline/jacocoTestReport.xml')
+          current  = parse('build/reports/jacoco/test/jacocoTestReport.xml')
+
+          ok = True
+          for pkg in sorted(set(baseline) | set(current)):
+              old = baseline.get(pkg, 0.0)
+              new = current.get(pkg, 0.0)
+              short = pkg.replace('com/fireflybot/', '')
+              arrow = '+' if new > old else ('-' if new < old else '=')
+              suffix = '  << REGRESSION' if new < old else ''
+              print(f'{short:45s}  {old:5.1f}% -> {new:5.1f}%  [{arrow}]{suffix}')
+              if new < old:
+                  ok = False
+
+          if not ok:
+              print()
+              print('Coverage has decreased in one or more packages.')
+              print('Add tests to restore it, or re-trigger the workflow manually')
+              print('with "Skip coverage-regression check" enabled if the decrease')
+              print('is intentional (e.g. deleting a feature with its tests).')
+          sys.exit(0 if ok else 1)
+          EOF

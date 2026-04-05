@@ -427,7 +427,7 @@ class WizardService(
             sessionRepository.save(session.copy(step = WizardStep.SelectTag))
             WizardResult.ShowTagList(tags)
         }
-        "sub" -> handleSubmit(session)
+        "sub" -> if (session.step is WizardStep.Preview) handleSubmit(session) else WizardResult.NoOp
         else -> WizardResult.NoOp
     }
 

@@ -15,8 +15,48 @@ java -jar build/libs/firefly-bot-1.0.0.jar
 docker compose up --build
 ```
 
-There are no automated tests yet. Verify changes by building (`gradle shadowJar`) and
-checking for compilation errors before declaring a task done.
+Run tests to verify changes:
+
+```bash
+# Run all tests (also generates JaCoCo coverage report under build/reports/jacoco/)
+JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle test --no-daemon
+```
+
+**Tests must pass before declaring a task done.**
+Always write or update tests for every new or changed behaviour. Coverage for `domain/model`,
+`application/wizard`, and `adapter/out/mock` must never fall below **85%** (instruction coverage).
+Check after running tests:
+
+```bash
+# Coverage check — exits 1 if any watched package falls below 85%
+python3 -c "
+import xml.etree.ElementTree as ET, sys
+tree = ET.parse('build/reports/jacoco/test/jacocoTestReport.xml')
+root = tree.getroot()
+THRESHOLD = 85.0
+ok = True
+for pkg in root.findall('package'):
+    name = pkg.get('name')
+    if not any(s in name for s in ('domain/model', 'application/wizard', 'adapter/out/mock')):
+        continue
+    for c in pkg.findall('counter'):
+        if c.get('type') == 'INSTRUCTION':
+            missed, covered = int(c.get('missed')), int(c.get('covered'))
+            total = missed + covered
+            pct = round(covered / total * 100, 1) if total else 0
+            status = 'OK' if pct >= THRESHOLD else 'BELOW THRESHOLD'
+            print(f'{name.replace(\"com/fireflybot/\",\"\"):45s} {pct}%  {status}')
+            if pct < THRESHOLD:
+                ok = False
+sys.exit(0 if ok else 1)
+"
+```
+
+Also build the fat JAR to catch compilation errors:
+
+```bash
+JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle shadowJar --no-daemon
+```
 
 ## Documentation rule
 
@@ -36,6 +76,7 @@ introducing new patterns or port interfaces, or changing the build setup.
 | Serialization  | kotlinx-serialization-json 1.7.3           |
 | Logging        | logback-classic 1.5.8 + kotlin-logging-jvm 6.0.9 (io.github.oshai) |
 | Build          | Gradle 9.4.1 (system), Shadow plugin 8.3.6 |
+| Testing        | JUnit 5.11.4, MockK 1.13.13, JaCoCo 0.8.12 |
 
 > **Build note**: system JDK is 25 but Kotlin 2.0.21 requires JDK 21. Always prefix
 > Gradle commands with `JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home`.

@@ -4,15 +4,59 @@ Guidance for AI coding agents working on this repository.
 
 ## Verify your work
 
-After any code change, confirm it compiles:
+After any code change, run the full test suite:
+
+```bash
+JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle test --no-daemon
+```
+
+Also verify the fat JAR compiles:
 
 ```bash
 JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle shadowJar --no-daemon
 ```
 
-A successful build produces `build/libs/firefly-bot-1.0.0.jar`. There are no automated
-tests; compilation success is the minimum bar. Do not declare a task done until the build
-passes cleanly.
+A successful build produces `build/libs/firefly-bot-1.0.0.jar`. **Do not declare a task
+done until all tests pass and the build is clean.**
+
+## Testing rules
+
+- **Write tests for every new or changed behaviour.** If you add a new wizard step, callback
+  prefix, or domain method, add corresponding unit tests before marking the task done.
+- **Coverage must never fall below 85% instruction coverage** for the three tested packages:
+  `domain/model`, `application/wizard`, and `adapter/out/mock`.
+- After running tests, check coverage with:
+
+```bash
+python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse('build/reports/jacoco/test/jacocoTestReport.xml')
+root = tree.getroot()
+THRESHOLD = 85.0
+ok = True
+for pkg in root.findall('package'):
+    name = pkg.get('name')
+    if not any(s in name for s in ('domain/model', 'application/wizard', 'adapter/out/mock')):
+        continue
+    for c in pkg.findall('counter'):
+        if c.get('type') == 'INSTRUCTION':
+            missed, covered = int(c.get('missed')), int(c.get('covered'))
+            total = missed + covered
+            pct = round(covered / total * 100, 1) if total else 0
+            status = 'OK' if pct >= THRESHOLD else 'BELOW THRESHOLD'
+            print(f'{name.replace(\"com/fireflybot/\",\"\"):45s} {pct}%  {status}')
+            if pct < THRESHOLD:
+                ok = False
+import sys; sys.exit(0 if ok else 1)
+"
+```
+
+  If the script exits with code 1, coverage has dropped — add more tests before finishing.
+- Test files live in `src/test/kotlin/com/fireflybot/` mirroring the main source tree.
+- Use **JUnit 5** (`org.junit.jupiter`) + **MockK** for mocking. Use
+  `InMemoryWizardSessionRepository` (real) + mocked port interfaces to test `WizardService`.
+- Infrastructure layers (Telegram SDK, Ktor HTTP, Koin DI, `AppConfig`) are intentionally
+  not unit-tested; do not add tests that require network or environment variables.
 
 ## Update documentation
 
