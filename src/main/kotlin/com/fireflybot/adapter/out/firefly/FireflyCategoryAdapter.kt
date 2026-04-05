@@ -12,12 +12,17 @@ import io.ktor.client.request.*
 class FireflyCategoryAdapter(
     private val config: AppConfig,
     private val httpClient: HttpClient,
+    private val categoriesCache: FireflyCache<Unit, List<Category>> = FireflyCache(),
 ) : CategoryRepository {
 
     private val log = KotlinLogging.logger {}
     private val baseUrl = config.fireflyHost.trimEnd('/')
 
     override fun getCategories(): List<Category> {
+        categoriesCache.get(Unit)?.let {
+            log.info { "Serving categories from cache" }
+            return it
+        }
         log.info { "Fetching categories" }
         return buildList {
             var page = 1
@@ -31,6 +36,6 @@ class FireflyCategoryAdapter(
                 val totalPages = response.meta?.pagination?.totalPages ?: 1
                 page++
             } while (page <= totalPages)
-        }
+        }.also { categoriesCache.put(Unit, it) }
     }
 }

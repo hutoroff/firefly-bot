@@ -12,12 +12,17 @@ import io.ktor.client.request.*
 class FireflyTagAdapter(
     private val config: AppConfig,
     private val httpClient: HttpClient,
+    private val tagsCache: FireflyCache<Unit, List<Tag>> = FireflyCache(),
 ) : TagRepository {
 
     private val log = KotlinLogging.logger {}
     private val baseUrl = config.fireflyHost.trimEnd('/')
 
     override fun getTags(): List<Tag> {
+        tagsCache.get(Unit)?.let {
+            log.info { "Serving tags from cache" }
+            return it
+        }
         log.info { "Fetching tags" }
         return buildList {
             var page = 1
@@ -31,6 +36,6 @@ class FireflyTagAdapter(
                 val totalPages = response.meta?.pagination?.totalPages ?: 1
                 page++
             } while (page <= totalPages)
-        }
+        }.also { tagsCache.put(Unit, it) }
     }
 }

@@ -16,37 +16,57 @@ import io.ktor.http.isSuccess
 class FireflyAccountAdapter(
     private val config: AppConfig,
     private val httpClient: HttpClient,
+    private val assetAccountsCache: FireflyCache<Unit, List<Account>> = FireflyCache(),
+    private val expenseSearchCache: FireflyCache<String, List<Account>> = FireflyCache(),
+    private val revenueSearchCache: FireflyCache<String, List<Account>> = FireflyCache(),
 ) : AccountRepository {
 
     private val log = KotlinLogging.logger {}
     private val baseUrl = config.fireflyHost.trimEnd('/')
 
     override fun getAssetAccounts(): List<Account> {
+        assetAccountsCache.get(Unit)?.let {
+            log.info { "Serving asset accounts from cache" }
+            return it
+        }
         log.info { "Fetching asset accounts" }
         return fetchAllAccountPages("$baseUrl/api/v1/accounts", mapOf("type" to "asset"))
+            .also { assetAccountsCache.put(Unit, it) }
     }
 
     override fun searchExpenseAccounts(query: String): List<Account> {
+        expenseSearchCache.get(query)?.let {
+            log.info { "Serving expense account search from cache" }
+            return it
+        }
         log.info { "Searching expense accounts" }
         return fetchAllAccountPages(
             "$baseUrl/api/v1/search/accounts",
             mapOf("query" to query, "type" to "expense", "field" to "all"),
-        )
+        ).also { expenseSearchCache.put(query, it) }
     }
 
     override fun searchRevenueAccounts(query: String): List<Account> {
+        revenueSearchCache.get(query)?.let {
+            log.info { "Serving revenue account search from cache" }
+            return it
+        }
         log.info { "Searching revenue accounts" }
         return fetchAllAccountPages(
             "$baseUrl/api/v1/search/accounts",
             mapOf("query" to query, "type" to "revenue", "field" to "all"),
-        )
+        ).also { revenueSearchCache.put(query, it) }
     }
 
-    override fun createExpenseAccount(name: String, currencyCode: String): Account =
-        createAccount(name, "expense", currencyCode)
+    override fun createExpenseAccount(name: String, currencyCode: String): Account {
+        expenseSearchCache.invalidateAll()
+        return createAccount(name, "expense", currencyCode)
+    }
 
-    override fun createRevenueAccount(name: String, currencyCode: String): Account =
-        createAccount(name, "revenue", currencyCode)
+    override fun createRevenueAccount(name: String, currencyCode: String): Account {
+        revenueSearchCache.invalidateAll()
+        return createAccount(name, "revenue", currencyCode)
+    }
 
     private fun createAccount(name: String, type: String, currencyCode: String): Account {
         log.info { "Creating $type account" }
