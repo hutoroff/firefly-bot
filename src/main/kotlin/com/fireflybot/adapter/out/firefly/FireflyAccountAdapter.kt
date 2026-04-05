@@ -11,6 +11,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.http.isSuccess
 
 class FireflyAccountAdapter(
     private val config: AppConfig,
@@ -29,7 +30,7 @@ class FireflyAccountAdapter(
         log.info { "Searching expense accounts" }
         return fetchAllAccountPages(
             "$baseUrl/api/v1/search/accounts",
-            mapOf("query" to query, "type" to "expense", "field" to "name_or_iban"),
+            mapOf("query" to query, "type" to "expense", "field" to "all"),
         )
     }
 
@@ -37,7 +38,7 @@ class FireflyAccountAdapter(
         log.info { "Searching revenue accounts" }
         return fetchAllAccountPages(
             "$baseUrl/api/v1/search/accounts",
-            mapOf("query" to query, "type" to "revenue", "field" to "name_or_iban"),
+            mapOf("query" to query, "type" to "revenue", "field" to "all"),
         )
     }
 
@@ -61,10 +62,14 @@ class FireflyAccountAdapter(
             var page = 1
             do {
                 val response = kotlinx.coroutines.runBlocking {
-                    httpClient.get(url) {
+                    val httpResponse = httpClient.get(url) {
                         params.forEach { (k, v) -> parameter(k, v) }
                         parameter("page", page)
-                    }.body<AccountListResponse>()
+                    }
+                    if (!httpResponse.status.isSuccess()) {
+                        error("Request to $url returned ${httpResponse.status.value}")
+                    }
+                    httpResponse.body<AccountListResponse>()
                 }
                 addAll(response.data.map { it.toDomain() })
                 val totalPages = response.meta?.pagination?.totalPages ?: 1
