@@ -22,6 +22,8 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
 
@@ -61,6 +63,14 @@ val appModule = module {
 
     // ── Application ───────────────────────────────────────────────────────────
 
+    // Shared daemon thread pool for background cache pre-warming.
+    // Daemon threads do not delay JVM shutdown; cached pool reuses idle threads.
+    single<Executor> {
+        Executors.newCachedThreadPool { r ->
+            Thread(r, "firefly-preload").apply { isDaemon = true }
+        }
+    }
+
     single {
         WizardService(
             sessionRepository = get(),
@@ -68,6 +78,7 @@ val appModule = module {
             categoryRepository = get(),
             transactionRepository = get(),
             tagRepository = get(),
+            executor = get(),
         )
     }
 

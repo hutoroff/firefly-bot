@@ -18,24 +18,21 @@ class FireflyCategoryAdapter(
     private val log = KotlinLogging.logger {}
     private val baseUrl = config.fireflyHost.trimEnd('/')
 
-    override fun getCategories(): List<Category> {
-        categoriesCache.get(Unit)?.let {
-            log.info { "Serving categories from cache" }
-            return it
+    override fun getCategories(): List<Category> =
+        categoriesCache.getOrLoad(Unit) {
+            log.info { "Fetching categories" }
+            buildList {
+                var page = 1
+                do {
+                    val response = kotlinx.coroutines.runBlocking {
+                        httpClient.get("$baseUrl/api/v1/categories") {
+                            parameter("page", page)
+                        }.body<CategoryListResponse>()
+                    }
+                    addAll(response.data.map { Category(id = it.id, name = it.attributes.name) })
+                    val totalPages = response.meta?.pagination?.totalPages ?: 1
+                    page++
+                } while (page <= totalPages)
+            }
         }
-        log.info { "Fetching categories" }
-        return buildList {
-            var page = 1
-            do {
-                val response = kotlinx.coroutines.runBlocking {
-                    httpClient.get("$baseUrl/api/v1/categories") {
-                        parameter("page", page)
-                    }.body<CategoryListResponse>()
-                }
-                addAll(response.data.map { Category(id = it.id, name = it.attributes.name) })
-                val totalPages = response.meta?.pagination?.totalPages ?: 1
-                page++
-            } while (page <= totalPages)
-        }.also { categoriesCache.put(Unit, it) }
-    }
 }

@@ -18,24 +18,21 @@ class FireflyTagAdapter(
     private val log = KotlinLogging.logger {}
     private val baseUrl = config.fireflyHost.trimEnd('/')
 
-    override fun getTags(): List<Tag> {
-        tagsCache.get(Unit)?.let {
-            log.info { "Serving tags from cache" }
-            return it
+    override fun getTags(): List<Tag> =
+        tagsCache.getOrLoad(Unit) {
+            log.info { "Fetching tags" }
+            buildList {
+                var page = 1
+                do {
+                    val response = kotlinx.coroutines.runBlocking {
+                        httpClient.get("$baseUrl/api/v1/tags") {
+                            parameter("page", page)
+                        }.body<TagListResponse>()
+                    }
+                    addAll(response.data.map { Tag(id = it.id, name = it.attributes.tag) })
+                    val totalPages = response.meta?.pagination?.totalPages ?: 1
+                    page++
+                } while (page <= totalPages)
+            }
         }
-        log.info { "Fetching tags" }
-        return buildList {
-            var page = 1
-            do {
-                val response = kotlinx.coroutines.runBlocking {
-                    httpClient.get("$baseUrl/api/v1/tags") {
-                        parameter("page", page)
-                    }.body<TagListResponse>()
-                }
-                addAll(response.data.map { Tag(id = it.id, name = it.attributes.tag) })
-                val totalPages = response.meta?.pagination?.totalPages ?: 1
-                page++
-            } while (page <= totalPages)
-        }.also { tagsCache.put(Unit, it) }
-    }
 }

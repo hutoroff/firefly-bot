@@ -12,6 +12,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.LocalDateTime
 import java.time.format.DateTimeParseException
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.Executor
 
 class WizardService(
     private val sessionRepository: WizardSessionRepository,
@@ -20,6 +21,7 @@ class WizardService(
     private val transactionRepository: TransactionRepository,
     private val tagRepository: TagRepository,
     private val pageSize: Int = 5,
+    private val executor: Executor,
 ) : WizardUseCase {
 
     private val log = KotlinLogging.logger {}
@@ -29,6 +31,7 @@ class WizardService(
 
     override fun startNewWizard(chatId: Long) {
         sessionRepository.save(WizardSession(chatId = chatId))
+        preload("asset accounts") { accountRepository.getAssetAccounts() }
     }
 
     override fun setWizardMessageId(chatId: Long, messageId: Int) {
@@ -118,6 +121,12 @@ class WizardService(
         }
         val updated = session.copy(step = firstStep, transactionType = type, accountPage = 0)
         sessionRepository.save(updated)
+
+        // Fire preloads before the blocking account-list fetch so they run in parallel.
+        preload("tags") { tagRepository.getTags() }
+        if (type == TransactionType.WITHDRAWAL || type == TransactionType.DEPOSIT) {
+            preload("categories") { categoryRepository.getCategories() }
+        }
 
         return if (type == TransactionType.DEPOSIT) {
             buildDestAccountList(updated, "Select destination account:")
@@ -596,5 +605,12 @@ class WizardService(
         if (bd > java.math.BigDecimal.ZERO) bd.toPlainString() else null
     } catch (_: NumberFormatException) {
         null
+    }
+
+    private fun preload(name: String, action: () -> Unit) {
+        executor.execute {
+            log.info { "Preloading $name" }
+            runCatching(action).onFailure { log.warn { "Preload of $name failed: ${it.message}" } }
+        }
     }
 }

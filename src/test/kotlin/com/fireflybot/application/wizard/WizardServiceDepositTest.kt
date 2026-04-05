@@ -12,6 +12,7 @@ import com.fireflybot.domain.model.Transaction
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import java.util.concurrent.Executor
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -49,7 +50,8 @@ class WizardServiceDepositTest {
     @BeforeEach
     fun setUp() {
         sessionRepo = JsonFileWizardSessionRepository(tempDir.resolve("sessions.json").toString())
-        service = WizardService(sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo)
+        service = WizardService(sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo,
+            executor = Executor { it.run() })
         every { accountRepo.getAssetAccounts() } returns assetAccounts
         every { accountRepo.searchRevenueAccounts(any()) } returns revenueAccounts
         every { accountRepo.searchRevenueAccounts("employer") } returns listOf(usdRevenueAccount)

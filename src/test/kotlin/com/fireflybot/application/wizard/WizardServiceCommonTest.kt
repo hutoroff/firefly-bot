@@ -10,6 +10,8 @@ import com.fireflybot.domain.model.Category
 import com.fireflybot.domain.model.Tag
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import java.util.concurrent.Executor
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -43,11 +45,50 @@ class WizardServiceCommonTest {
     @BeforeEach
     fun setUp() {
         sessionRepo = JsonFileWizardSessionRepository(tempDir.resolve("sessions.json").toString())
-        service = WizardService(sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo)
+        service = WizardService(sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo,
+            executor = Executor { it.run() })
         every { accountRepo.getAssetAccounts() } returns accounts
         every { categoryRepo.getCategories() } returns categories
         every { txRepo.createTransaction(any()) } returns "tx-id"
         every { tagRepo.getTags() } returns listOf(Tag("1", "food"), Tag("2", "transport"), Tag("3", "utilities"))
+    }
+
+    // ── Cache preloads ────────────────────────────────────────────────────────
+
+    @Test
+    fun `startNewWizard preloads asset accounts`() {
+        service.startNewWizard(chatId)
+        verify(atLeast = 1) { accountRepo.getAssetAccounts() }
+    }
+
+    @Test
+    fun `type selection preloads tags for all transaction types`() {
+        for (type in listOf("transfer", "withdrawal", "deposit")) {
+            service.startNewWizard(chatId)
+            service.handleCallback(chatId, messageId, "t:$type")
+            verify(atLeast = 1) { tagRepo.getTags() }
+        }
+    }
+
+    @Test
+    fun `type selection preloads categories for withdrawal`() {
+        service.startNewWizard(chatId)
+        service.handleCallback(chatId, messageId, "t:withdrawal")
+        verify(atLeast = 1) { categoryRepo.getCategories() }
+    }
+
+    @Test
+    fun `type selection preloads categories for deposit`() {
+        service.startNewWizard(chatId)
+        service.handleCallback(chatId, messageId, "t:deposit")
+        verify(atLeast = 1) { categoryRepo.getCategories() }
+    }
+
+    @Test
+    fun `type selection does not preload categories for transfer`() {
+        service.startNewWizard(chatId)
+        service.handleCallback(chatId, messageId, "t:transfer")
+        verify(exactly = 0) { categoryRepo.getCategories() }
     }
 
     // ── Session lifecycle ────────────────────────────────────────────────────
