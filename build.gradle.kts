@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.0.21"
     kotlin("plugin.serialization") version "2.0.21"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("com.gradleup.shadow") version "8.3.6"
     application
 }
 
@@ -35,6 +35,10 @@ dependencies {
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.8")
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.9")
+}
+
+kotlin {
+    jvmToolchain(21)
 }
 
 application {

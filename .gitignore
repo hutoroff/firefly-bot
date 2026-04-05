@@ -9,5 +9,8 @@ build/
 # Environment - never commit secrets
 .env
 
+# Kotlin compiler crash logs
+.kotlin/
+
 # macOS
 .DS_Store

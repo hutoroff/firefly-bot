@@ -3,6 +3,8 @@ package com.fireflybot.di
 import com.fireflybot.config.AppConfig
 import com.fireflybot.firefly.FireflyClient
 import com.fireflybot.telegram.FireflyBot
+import com.fireflybot.telegram.wizard.WizardHandler
+import com.fireflybot.telegram.wizard.WizardSessionStore
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -23,8 +25,8 @@ val appModule = module {
         val config: AppConfig = get()
         HttpClient(OkHttp) {
             defaultRequest {
-                header("Authorization", "Bearer ${config.fireflyToken}")
-                header("Accept", "application/vnd.api+json")
+                headers.append("Authorization", "Bearer ${config.fireflyToken}")
+                headers.append("Accept", "application/vnd.api+json")
                 contentType(ContentType.Application.Json)
             }
             install(ContentNegotiation) {
@@ -41,5 +43,7 @@ val appModule = module {
     }
 
     single { FireflyClient(get(), get()) }
-    single { FireflyBot(get(), get()) }
+    single { WizardSessionStore() }
+    single { WizardHandler(get()) }
+    single { FireflyBot(get(), get(), get()) }
 }
