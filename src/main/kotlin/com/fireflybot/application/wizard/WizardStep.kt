@@ -33,4 +33,6 @@ sealed class WizardStep {
     data object Preview : WizardStep()
     data object EnterDateTime : WizardStep()
     data object SelectTag : WizardStep()
+    /** User types a free-text description/note for the transaction. */
+    data object EnterDescription : WizardStep()
 }

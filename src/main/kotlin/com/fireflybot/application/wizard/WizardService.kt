@@ -97,6 +97,7 @@ class WizardService(
             WizardStep.EnterNewExpenseAccountName -> handleNewExpenseAccountName(session, text)
             WizardStep.EnterRevenueAccountQuery -> handleRevenueAccountQuery(session, text)
             WizardStep.EnterNewRevenueAccountName -> handleNewRevenueAccountName(session, text)
+            WizardStep.EnterDescription -> handleDescriptionInput(session, text)
             else -> WizardResult.NoOp
         }
     }
@@ -491,6 +492,10 @@ class WizardService(
             sessionRepository.save(updated)
             buildCategoryList(updated)
         }
+        "desc" -> {
+            sessionRepository.save(session.copy(step = WizardStep.EnterDescription))
+            WizardResult.ShowTextPrompt("Enter description (leave blank to clear):")
+        }
         else -> WizardResult.NoOp
     }
 
@@ -512,6 +517,15 @@ class WizardService(
     private fun handleTagSelected(session: WizardSession, tagId: String): WizardResult {
         val tagName = tagRepository.getTags().find { it.id == tagId }?.name ?: return WizardResult.NoOp
         val updated = session.copy(step = WizardStep.Preview, tag = tagName)
+        sessionRepository.save(updated)
+        return WizardResult.ShowPreview(updated)
+    }
+
+    // ── Description input ─────────────────────────────────────────────────────
+
+    private fun handleDescriptionInput(session: WizardSession, text: String): WizardResult {
+        val trimmed = text.trim().ifEmpty { null }
+        val updated = session.copy(step = WizardStep.Preview, description = trimmed)
         sessionRepository.save(updated)
         return WizardResult.ShowPreview(updated)
     }
@@ -541,6 +555,7 @@ class WizardService(
                 destAmount = session.destAmount,
                 dateTime = session.dateTime,
                 tag = session.tag,
+                description = session.description,
             )
         }
         TransactionType.WITHDRAWAL -> {
@@ -554,6 +569,7 @@ class WizardService(
                 category = session.category,
                 dateTime = session.dateTime,
                 tag = session.tag,
+                description = session.description,
             )
         }
         TransactionType.DEPOSIT -> {
@@ -567,6 +583,7 @@ class WizardService(
                 category = session.category,
                 dateTime = session.dateTime,
                 tag = session.tag,
+                description = session.description,
             )
         }
         null -> null

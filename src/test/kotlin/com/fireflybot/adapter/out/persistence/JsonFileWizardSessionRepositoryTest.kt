@@ -133,6 +133,7 @@ class JsonFileWizardSessionRepositoryTest {
             destAmount = "110.00",
             dateTime = fixedTime,
             tag = "groceries",
+            description = "test description",
             category = Category("cat-1", "Food"),
             expenseAccountQuery = "super",
             revenueAccountQuery = "salary",
@@ -156,6 +157,7 @@ class JsonFileWizardSessionRepositoryTest {
         assertNull(loaded.sourceAmount)
         assertNull(loaded.destAmount)
         assertNull(loaded.tag)
+        assertNull(loaded.description)
         assertNull(loaded.category)
         assertNull(loaded.expenseAccountQuery)
         assertNull(loaded.revenueAccountQuery)
@@ -182,6 +184,7 @@ class JsonFileWizardSessionRepositoryTest {
             WizardStep.Preview,
             WizardStep.EnterDateTime,
             WizardStep.SelectTag,
+            WizardStep.EnterDescription,
         )
     }
 

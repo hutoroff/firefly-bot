@@ -88,6 +88,7 @@ class JsonFileWizardSessionRepository(filePath: String) : WizardSessionRepositor
         destAmount = destAmount,
         dateTime = dateTime.toString(),
         tag = tag,
+        description = description,
         categoryId = category?.id,
         categoryName = category?.name,
         expenseAccountQuery = expenseAccountQuery,
@@ -107,6 +108,7 @@ class JsonFileWizardSessionRepository(filePath: String) : WizardSessionRepositor
         destAmount = destAmount,
         dateTime = LocalDateTime.parse(dateTime),
         tag = tag,
+        description = description,
         category = buildCategory(categoryId, categoryName),
         expenseAccountQuery = expenseAccountQuery,
         revenueAccountQuery = revenueAccountQuery,
@@ -139,6 +141,7 @@ class JsonFileWizardSessionRepository(filePath: String) : WizardSessionRepositor
         "Preview" -> WizardStep.Preview
         "EnterDateTime" -> WizardStep.EnterDateTime
         "SelectTag" -> WizardStep.SelectTag
+        "EnterDescription" -> WizardStep.EnterDescription
         else -> error("Unknown WizardStep: '$this'")
     }
 }

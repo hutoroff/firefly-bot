@@ -35,6 +35,7 @@ class TransactionTest {
         assertTrue(text.contains("Amount: 100.00 USD"))
         assertTrue(text.contains("Date: 15.03.2024 10:30"))
         assertTrue(text.contains("Tag: (none)"))
+        assertTrue(text.contains("Description: (none)"))
     }
 
     @Test
@@ -51,6 +52,7 @@ class TransactionTest {
         val text = tx.previewText()
         assertTrue(text.contains("100.00 USD -> 92.00 EUR"))
         assertTrue(text.contains("Tag: travel"))
+        assertTrue(text.contains("Description: (none)"))
     }
 
     @Test
@@ -87,6 +89,7 @@ class TransactionTest {
         assertTrue(text.contains("Amount: 50.00 USD"))
         assertTrue(text.contains("Category: Food & Dining"))
         assertTrue(text.contains("Tag: food"))
+        assertTrue(text.contains("Description: (none)"))
     }
 
     @Test
@@ -102,6 +105,7 @@ class TransactionTest {
         val text = tx.previewText()
         assertTrue(text.contains("Category: -"))
         assertTrue(text.contains("Tag: (none)"))
+        assertTrue(text.contains("Description: (none)"))
     }
 
     // ── Deposit previewText ───────────────────────────────────────────────────
@@ -123,6 +127,7 @@ class TransactionTest {
         assertTrue(text.contains("Amount: 2000.00 USD"))
         assertTrue(text.contains("Category: Food & Dining"))
         assertTrue(text.contains("Tag: salary"))
+        assertTrue(text.contains("Description: (none)"))
     }
 
     @Test
@@ -138,6 +143,7 @@ class TransactionTest {
         val text = tx.previewText()
         assertTrue(text.contains("Category: -"))
         assertTrue(text.contains("Tag: (none)"))
+        assertTrue(text.contains("Description: (none)"))
     }
 
     // ── Transfer successText ──────────────────────────────────────────────────
@@ -247,5 +253,52 @@ class TransactionTest {
         )
         val text = tx.previewText()
         assertTrue(text.contains("Date: 01.12.2025 09:05"))
+    }
+
+    // ── Description field ─────────────────────────────────────────────────────
+
+    @Test
+    fun `previewText shows description when set`() {
+        val tx = Transaction.Withdrawal(
+            sourceAccount = usdAccount,
+            expenseAccount = expenseAccount,
+            amount = "20.00",
+            category = null,
+            dateTime = dt,
+            tag = null,
+            description = "Lunch with colleagues",
+        )
+        val text = tx.previewText()
+        assertTrue(text.contains("Description: Lunch with colleagues"))
+    }
+
+    @Test
+    fun `successText shows description when set`() {
+        val tx = Transaction.Transfer(
+            sourceAccount = usdAccount,
+            destinationAccount = savingsAccount,
+            amount = "500.00",
+            sourceAmount = null,
+            destAmount = null,
+            dateTime = dt,
+            tag = null,
+            description = "Monthly savings",
+        )
+        val text = tx.successText()
+        assertTrue(text.contains("Description: Monthly savings"))
+    }
+
+    @Test
+    fun `successText shows none when description is null`() {
+        val tx = Transaction.Deposit(
+            revenueAccount = revenueAccount,
+            destinationAccount = usdAccount,
+            amount = "100.00",
+            category = null,
+            dateTime = dt,
+            tag = null,
+        )
+        val text = tx.successText()
+        assertTrue(text.contains("Description: (none)"))
     }
 }

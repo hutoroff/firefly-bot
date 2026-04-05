@@ -19,6 +19,8 @@ data class WizardSession(
     val destAmount: String? = null,
     val dateTime: LocalDateTime = LocalDateTime.now(),
     val tag: String? = null,
+    /** Optional free-text description/notes entered from the preview screen. */
+    val description: String? = null,
     /** Selected category (withdrawal and deposit only). */
     val category: Category? = null,
     /** Last expense-account search query; retained so page navigation can re-filter without re-asking. */

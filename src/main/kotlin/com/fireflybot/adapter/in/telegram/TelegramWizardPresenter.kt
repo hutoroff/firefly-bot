@@ -153,6 +153,7 @@ class TelegramWizardPresenter(private val pageSize: Int = 5) {
         }
         rows += listOf(button("Change date/time", "pv:dt"))
         rows += listOf(button(if (session.tag != null) "Change tag" else "Add tag", "pv:tag"))
+        rows += listOf(button(if (session.description != null) "Change description" else "Add description", "pv:desc"))
         rows += listOf(button("Submit", "pv:sub"))
         edit(bot, chatId, messageId, buildPreviewText(session), inlineKeyboard(rows))
     }
@@ -191,7 +192,8 @@ class TelegramWizardPresenter(private val pageSize: Int = 5) {
             null -> appendLine("Type: unknown")
         }
         appendLine("Date: ${session.dateTime.format(dtFormatter)}")
-        append("Tag: ${session.tag ?: "(none)"}")
+        appendLine("Tag: ${session.tag ?: "(none)"}")
+        append("Description: ${session.description ?: "(none)"}")
     }
 
     // ── Keyboard builders ─────────────────────────────────────────────────────

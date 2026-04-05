@@ -8,6 +8,7 @@ private val dtFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
 sealed class Transaction {
     abstract val dateTime: LocalDateTime
     abstract val tag: String?
+    abstract val description: String?
 
     data class Transfer(
         val sourceAccount: Account,
@@ -20,6 +21,7 @@ sealed class Transaction {
         val destAmount: String?,
         override val dateTime: LocalDateTime,
         override val tag: String?,
+        override val description: String? = null,
     ) : Transaction()
 
     data class Withdrawal(
@@ -29,6 +31,7 @@ sealed class Transaction {
         val category: Category?,
         override val dateTime: LocalDateTime,
         override val tag: String?,
+        override val description: String? = null,
     ) : Transaction()
 
     data class Deposit(
@@ -38,6 +41,7 @@ sealed class Transaction {
         val category: Category?,
         override val dateTime: LocalDateTime,
         override val tag: String?,
+        override val description: String? = null,
     ) : Transaction()
 
     fun previewText(): String = buildString {
@@ -71,7 +75,8 @@ sealed class Transaction {
             }
         }
         appendLine("Date: ${dateTime.format(dtFormatter)}")
-        append("Tag: ${tag ?: "(none)"}")
+        appendLine("Tag: ${tag ?: "(none)"}")
+        append("Description: ${description ?: "(none)"}")
     }
 
     fun successText(): String = buildString {
@@ -99,6 +104,7 @@ sealed class Transaction {
             }
         }
         appendLine("Date: ${dateTime.format(dtFormatter)}")
-        append("Tag: ${tag ?: "(none)"}")
+        appendLine("Tag: ${tag ?: "(none)"}")
+        append("Description: ${description ?: "(none)"}")
     }
 }

@@ -24,8 +24,8 @@ class FireflyTransactionAdapter(
 
     override fun createTransaction(transaction: Transaction): String {
         val request = transaction.toRequest()
-        val description = request.transactions.firstOrNull()?.description ?: "unknown"
-        log.info { "Creating transaction: $description" }
+        val type = request.transactions.firstOrNull()?.type ?: "unknown"
+        log.info { "Creating transaction type=$type" }
         return try {
             val result: TransactionSingle = kotlinx.coroutines.runBlocking {
                 httpClient.post("$baseUrl/api/v1/transactions") {
@@ -35,7 +35,7 @@ class FireflyTransactionAdapter(
             log.info { "Transaction created successfully, id=${result.data.id}" }
             result.data.id
         } catch (e: Exception) {
-            log.error(e) { "Failed to create transaction: $description" }
+            log.error(e) { "Failed to create transaction type=$type" }
             throw e
         }
     }
@@ -48,7 +48,7 @@ class FireflyTransactionAdapter(
                 type = "transfer",
                 date = isoDate,
                 amount = amount ?: sourceAmount ?: "0",
-                description = "Transfer: ${sourceAccount.name} → ${destinationAccount.name}",
+                description = description ?: "Transfer: ${sourceAccount.name} → ${destinationAccount.name}",
                 sourceId = sourceAccount.id,
                 destinationId = destinationAccount.id,
                 tags = tagsList,
@@ -57,7 +57,7 @@ class FireflyTransactionAdapter(
                 type = "withdrawal",
                 date = isoDate,
                 amount = amount,
-                description = "Withdrawal to ${expenseAccount.name}",
+                description = description ?: "Withdrawal to ${expenseAccount.name}",
                 sourceId = sourceAccount.id,
                 destinationName = expenseAccount.name,
                 category = category?.name,
@@ -67,7 +67,7 @@ class FireflyTransactionAdapter(
                 type = "deposit",
                 date = isoDate,
                 amount = amount,
-                description = "Deposit from ${revenueAccount.name}",
+                description = description ?: "Deposit from ${revenueAccount.name}",
                 sourceName = revenueAccount.name,
                 destinationId = destinationAccount.id,
                 category = category?.name,

@@ -20,6 +20,7 @@ class WizardSessionDto(
     /** ISO-8601 string from LocalDateTime.toString(). */
     val dateTime: String,
     val tag: String? = null,
+    val description: String? = null,
     val categoryId: String? = null,
     val categoryName: String? = null,
     val expenseAccountQuery: String? = null,

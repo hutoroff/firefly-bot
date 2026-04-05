@@ -263,4 +263,48 @@ class WizardServiceCommonTest {
         val result = service.handleCallback(chatId, messageId, "tg:unknown-id")
         assertTrue(result is WizardResult.NoOp)
     }
+
+    // ── Description input ─────────────────────────────────────────────────────
+
+    @Test
+    fun `pv-desc action transitions to EnterDescription step and returns text prompt`() {
+        driveToPreviewTransfer()
+        val result = service.handleCallback(chatId, messageId, "pv:desc")
+        assertTrue(result is WizardResult.ShowTextPrompt)
+        assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.EnterDescription)
+    }
+
+    @Test
+    fun `description input saves description and returns preview`() {
+        driveToPreviewTransfer()
+        service.handleCallback(chatId, messageId, "pv:desc")
+
+        val result = service.handleText(chatId, "My custom note")
+        assertTrue(result is WizardResult.ShowPreview)
+        val session = (result as WizardResult.ShowPreview).session
+        assertEquals("My custom note", session.description)
+        assertTrue(session.step is WizardStep.Preview)
+    }
+
+    @Test
+    fun `description input trims whitespace`() {
+        driveToPreviewTransfer()
+        service.handleCallback(chatId, messageId, "pv:desc")
+
+        val result = service.handleText(chatId, "  trimmed  ")
+        assertTrue(result is WizardResult.ShowPreview)
+        assertEquals("trimmed", (result as WizardResult.ShowPreview).session.description)
+    }
+
+    @Test
+    fun `blank description input clears description and returns preview`() {
+        driveToPreviewTransfer()
+        service.handleCallback(chatId, messageId, "pv:desc")
+        service.handleText(chatId, "initial note")
+        service.handleCallback(chatId, messageId, "pv:desc")
+
+        val result = service.handleText(chatId, "   ")
+        assertTrue(result is WizardResult.ShowPreview)
+        assertNull((result as WizardResult.ShowPreview).session.description)
+    }
 }
