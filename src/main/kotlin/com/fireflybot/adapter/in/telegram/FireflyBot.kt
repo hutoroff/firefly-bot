@@ -21,6 +21,16 @@ class FireflyBot(
     override fun getBotUsername(): String = config.telegramBotUsername
 
     override fun onUpdateReceived(update: Update) {
+        val userId = when {
+            update.hasCallbackQuery() -> update.callbackQuery.from?.id
+            update.hasMessage() -> update.message.from?.id
+            else -> null
+        }
+        if (userId != config.telegramAllowedUserId) {
+            log.warn { "Ignored update from unauthorized user=$userId" }
+            if (update.hasCallbackQuery()) answerCallback(update.callbackQuery.id)
+            return
+        }
         when {
             update.hasCallbackQuery() -> {
                 val query = update.callbackQuery
