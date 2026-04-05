@@ -2,7 +2,7 @@
 FROM gradle:8.10-jdk21 AS builder
 WORKDIR /app
 COPY . .
-RUN gradle shadowJar --no-daemon
+RUN gradle clean shadowJar --no-daemon
 
 # ── Stage 2: Build a minimal custom JRE via jlink ─────────────────────────
 # Uses jdeps to detect required modules, then adds crypto/unsafe extras that

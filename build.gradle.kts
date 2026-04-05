@@ -51,6 +51,10 @@ application {
     mainClass.set("com.fireflybot.MainKt")
 }
 
+tasks.jar {
+    archiveClassifier.set("plain")          // avoid clobbering the fat JAR
+}
+
 tasks.shadowJar {
     archiveClassifier.set("")
     manifest {

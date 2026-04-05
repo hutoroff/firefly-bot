@@ -63,13 +63,14 @@ jobs:
 
           echo "CI is green for ${{ github.sha }} ✓"
 
-  # ── Release: bump → build → test → commit/tag/push → Docker → GitHub release ─
+  # ── Release: bump → build → commit/tag/push → CI gate → Docker → GitHub release ─
   release:
     name: Build and publish release
     needs: guard
     runs-on: ubuntu-latest
     permissions:
       contents: write   # push version-bump commit + tag, create GitHub release
+      actions: read     # poll CI status on the version-bump commit
 
     steps:
       - uses: actions/checkout@v4
@@ -120,15 +121,6 @@ jobs:
       - name: Build fat JAR
         run: gradle shadowJar --no-daemon
 
-      # ── Run tests and verify coverage on the version-bumped code ──────────
-      # Both steps must pass before any external artifact is published so the
-      # release always reflects a fully validated state.
-      - name: Run tests and generate coverage report
-        run: gradle test jacocoTestReport --no-daemon
-
-      - name: Enforce 75 % instruction-coverage floor
-        run: gradle jacocoTestCoverageVerification --no-daemon
-
       # ── Assemble release notes ─────────────────────────────────────────────
       - name: Generate changelog
         run: |
@@ -172,9 +164,45 @@ jobs:
           # Push back to the branch that triggered the workflow, not a hard-coded ref.
           git push origin "HEAD:${{ github.ref_name }}" --follow-tags
 
+      # ── Wait for CI to pass on the version-bump commit ────────────────────
+      # The guard job verified CI on the pre-bump HEAD. The version bump
+      # itself changes only build.gradle.kts and docs, but we still require
+      # a green CI run on the exact commit being released before publishing.
+      # Polls every 30 s for up to 15 min; fails the release if CI fails.
+      - name: Wait for CI on version-bump commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          echo "Polling CI for commit $SHA (up to 15 min) …"
+          for i in $(seq 1 30); do
+            ROW=$(gh run list \
+              --repo  "$GITHUB_REPOSITORY" \
+              --workflow ci.yml \
+              --commit "$SHA" \
+              --limit  1 \
+              --json   status,conclusion \
+              --jq     '.[0] // empty')
+
+            STATUS=$(echo     "$ROW" | jq -r '.status     // "pending"')
+            CONCLUSION=$(echo "$ROW" | jq -r '.conclusion // ""')
+
+            echo "  attempt $i/30 — status=$STATUS conclusion=$CONCLUSION"
+
+            if   [ "$STATUS" = "completed" ] && [ "$CONCLUSION" = "success" ]; then
+              echo "CI passed ✓"; exit 0
+            elif [ "$STATUS" = "completed" ]; then
+              echo "::error::CI ended with conclusion '$CONCLUSION' — aborting release"
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "::error::Timed out waiting for CI on $SHA"
+          exit 1
+
       # ── Push Docker image to Docker Hub ───────────────────────────────────
-      # Runs after the Git push so the published image always has a matching
-      # tag and commit in the repository.
+      # Runs after the CI gate so the published image always has a matching
+      # green CI run on its exact commit.
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:

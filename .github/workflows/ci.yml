@@ -17,7 +17,7 @@ on:
 
 jobs:
   ci:
-    name: Build and test
+    name: Compile and test
     runs-on: ubuntu-latest
 
     permissions:
@@ -37,8 +37,8 @@ jobs:
           cache: gradle
 
       # ── Build ─────────────────────────────────────────────────────────────────
-      - name: Build fat JAR
-        run: gradle shadowJar --no-daemon
+      - name: Compile
+        run: gradle classes testClasses --no-daemon
 
       # ── Test + coverage report ────────────────────────────────────────────────
       - name: Run tests and generate coverage report
