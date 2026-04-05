@@ -11,12 +11,16 @@ JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle
 # Run locally (requires .env exported or env vars set)
 java -jar build/libs/firefly-bot-1.0.1.jar
 
-# Docker — build from source (development)
+# Docker — build from source (development); uses Dockerfile (3-stage with jlink)
 docker compose up --build
 
 # Docker — pull pre-built image from Docker Hub (production)
 # Requires FIREFLY_BOT_IMAGE=<dockerhub-username>/firefly-bot:<version> in .env
 docker compose -f docker-compose.hub.yml up -d
+
+# Note: Dockerfile.release is used only by the release CI workflow.
+# It copies the pre-built fat JAR (build/libs/*.jar) instead of running Gradle,
+# so the JAR is compiled only once per release run.
 ```
 
 Run tests to verify changes:

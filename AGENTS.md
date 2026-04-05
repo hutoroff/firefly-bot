@@ -144,9 +144,20 @@ Gradle commands with `JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.
 
 ## Docker
 
-The Dockerfile is a two-stage build. The builder stage uses the Gradle image (no wrapper
-needed); the runtime stage uses a minimal JRE. The `.dockerignore` excludes `.env`,
-`build/`, and `.git` — do not remove these exclusions.
+There are two Dockerfiles:
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Three-stage build: Gradle → jlink custom JRE → Alpine runtime. Used by `docker compose up --build` for local development. |
+| `Dockerfile.release` | Two-stage build: jlink custom JRE → Alpine runtime. Used by the release CI workflow. Expects the fat JAR to already exist in `build/libs/` so Gradle is not run a second time. |
+
+Both produce the same runtime image structure: a bare `alpine:3.21` base with `ca-certificates`
+installed, a stripped custom JRE built by `jlink` (only the modules the app actually needs), and
+the fat JAR.
+
+The `.dockerignore` excludes `.env`, `.git`, `.gradle`, and most of `build/` — but intentionally
+keeps `build/libs/` so that `Dockerfile.release` can copy the pre-built JAR. Do not add `build`
+or `build/libs` as broad exclusions.
 
 Two Compose files are provided:
 
@@ -155,5 +166,6 @@ Two Compose files are provided:
 | `docker-compose.yml` | Builds the image from source (`build: .`). Used for local development. |
 | `docker-compose.hub.yml` | Pulls a pre-built image from Docker Hub. Used for production deployments. Requires `FIREFLY_BOT_IMAGE` to be set in `.env` (e.g. `<dockerhub-username>/firefly-bot:1.2.3`). Uses required-variable syntax — Compose will fail with a clear message if `FIREFLY_BOT_IMAGE` is unset. |
 
-The release workflow (`release.yml`) pushes both a versioned tag and `latest` to Docker Hub.
-The exact `docker pull` command for each release is printed in the GitHub Release notes.
+The release workflow (`release.yml`) builds the fat JAR once, uses it both for the GitHub release
+artifact and for building the Docker image via `Dockerfile.release`, then pushes both a versioned
+tag and `latest` to Docker Hub. The exact `docker pull` command is printed in the GitHub Release notes.

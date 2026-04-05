@@ -185,6 +185,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          # Dockerfile.release skips the Gradle build stage: it reuses the fat
+          # JAR already built above, so the JAR is compiled only once per release.
+          file: Dockerfile.release
           push: true
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/firefly-bot:${{ steps.ver.outputs.new }}

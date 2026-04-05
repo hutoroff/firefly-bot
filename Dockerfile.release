@@ -1,14 +1,13 @@
-# ── Stage 1: Build the fat JAR ─────────────────────────────────────────────
-FROM gradle:8.10-jdk21 AS builder
-WORKDIR /app
-COPY . .
-RUN gradle shadowJar --no-daemon
+# CI-only Dockerfile — expects the fat JAR to already exist in build/libs/.
+# The release workflow builds the JAR once (for the GitHub release artifact)
+# and reuses it here, avoiding a second Gradle build inside Docker.
+#
+# For local development use the main Dockerfile instead:
+#   docker compose up --build
 
-# ── Stage 2: Build a minimal custom JRE via jlink ─────────────────────────
-# Uses jdeps to detect required modules, then adds crypto/unsafe extras that
-# are loaded via reflection and thus invisible to static analysis.
+# ── Stage 1: Build a minimal custom JRE via jlink ─────────────────────────
 FROM eclipse-temurin:21-jdk-alpine AS jre-builder
-COPY --from=builder /app/build/libs/*.jar /tmp/app.jar
+COPY build/libs/*.jar /tmp/app.jar
 RUN JDEPS=$(jdeps --ignore-missing-deps --multi-release 21 \
               --print-module-deps /tmp/app.jar 2>/dev/null | tr -d '[:space:]') \
  && MODS=$(printf '%s,jdk.crypto.ec,jdk.unsupported' "$JDEPS" \
@@ -19,7 +18,7 @@ RUN JDEPS=$(jdeps --ignore-missing-deps --multi-release 21 \
       --compress=2 \
       --output /opt/custom-jre
 
-# ── Stage 3: Minimal runtime image ────────────────────────────────────────
+# ── Stage 2: Minimal runtime image ────────────────────────────────────────
 FROM alpine:3.21
 # ca-certificates provides OS-level trust anchors needed for HTTPS connections
 # (Telegram API, Firefly III).  The custom JRE carries its own Java cacerts, but

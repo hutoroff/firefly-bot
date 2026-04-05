@@ -1,6 +1,13 @@
 .git
 .gradle
-build
+# Exclude heavy intermediate build artefacts.  build/libs/ is intentionally
+# NOT excluded: Dockerfile.release copies the pre-built fat JAR from there.
+build/classes
+build/generated
+build/kotlin
+build/reports
+build/resources
+build/tmp
 .idea
 
 # Never bake secrets into image layers
