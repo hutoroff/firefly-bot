@@ -1,0 +1,198 @@
+name: Release
+
+# Manually triggered release workflow.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   DOCKERHUB_USERNAME  – Docker Hub account name
+#   DOCKERHUB_TOKEN     – Docker Hub access token (read/write access to the repo)
+#
+# Optional secret (needed only when the main branch has required-review push
+# protection that blocks the default GITHUB_TOKEN):
+#   RELEASE_TOKEN  – PAT with "repo" scope; grant it bypass permission in the
+#                    branch-protection rule for github-actions[bot] or the PAT owner
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+
+  # ── Guard: abort early unless CI is green on the exact commit being released ─
+  guard:
+    name: Verify CI passed on HEAD
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read   # needed to query workflow runs
+    steps:
+      # workflow_dispatch has no branch filter, so reject non-main refs here.
+      - name: Ensure this is running from main
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo "::error::Releases must be triggered from the main branch (got '${{ github.ref_name }}')."
+            exit 1
+          fi
+
+      - name: Check for a successful CI run on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COUNT=$(gh run list \
+            --repo  "$GITHUB_REPOSITORY" \
+            --workflow ci.yml \
+            --commit "${{ github.sha }}" \
+            --status success \
+            --limit  1 \
+            --json   databaseId \
+            --jq     'length')
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No successful CI run found for commit ${{ github.sha }}."
+            echo "Please wait for the CI workflow to pass before triggering a release."
+            exit 1
+          fi
+
+          echo "CI is green for ${{ github.sha }} ✓"
+
+  # ── Release: bump → build → test → commit/tag/push → Docker → GitHub release ─
+  release:
+    name: Build and publish release
+    needs: guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push version-bump commit + tag, create GitHub release
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use a PAT when the repo has branch-protection push rules; falls back
+          # to the default GITHUB_TOKEN (sufficient for repos without such rules).
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: gradle
+
+      # ── Compute the next semantic version ─────────────────────────────────
+      - name: Compute new version
+        id: ver
+        run: |
+          CUR=$(grep -oP '(?<=version = ")[^"]+' build.gradle.kts)
+          IFS='.' read -r MAJ MIN PAT <<< "$CUR"
+
+          case "${{ inputs.version_bump }}" in
+            major) MAJ=$((MAJ + 1)); MIN=0; PAT=0 ;;
+            minor) MIN=$((MIN + 1)); PAT=0 ;;
+            patch) PAT=$((PAT + 1)) ;;
+          esac
+
+          NEW="$MAJ.$MIN.$PAT"
+          echo "current=$CUR" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW"     >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW"    >> "$GITHUB_OUTPUT"
+
+      # ── Apply the new version to all relevant files ────────────────────────
+      - name: Bump version in build.gradle.kts and docs
+        run: |
+          CUR="${{ steps.ver.outputs.current }}"
+          NEW="${{ steps.ver.outputs.new }}"
+
+          # Primary version declaration
+          sed -i "s/version = \"$CUR\"/version = \"$NEW\"/" build.gradle.kts
+
+          # Update JAR filename references in Markdown docs (README, CLAUDE, AGENTS, …)
+          git grep -l "firefly-bot-$CUR" -- '*.md' \
+            | xargs -r sed -i "s/firefly-bot-$CUR/firefly-bot-$NEW/g"
+
+      # ── Build the fat JAR ──────────────────────────────────────────────────
+      - name: Build fat JAR
+        run: gradle shadowJar --no-daemon
+
+      # ── Run tests and verify coverage on the version-bumped code ──────────
+      # Both steps must pass before any external artifact is published so the
+      # release always reflects a fully validated state.
+      - name: Run tests and generate coverage report
+        run: gradle test jacocoTestReport --no-daemon
+
+      - name: Enforce 85 % instruction-coverage floor
+        run: gradle jacocoTestCoverageVerification --no-daemon
+
+      # ── Assemble release notes ─────────────────────────────────────────────
+      - name: Generate changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)")
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" "${LAST_TAG}..HEAD")
+          fi
+
+          {
+            echo "## What's Changed"
+            echo ""
+            echo "${COMMITS:-_No commits since last release._}"
+            echo ""
+            echo "## Docker Image"
+            echo ""
+            echo '```'
+            echo "docker pull ${{ secrets.DOCKERHUB_USERNAME }}/firefly-bot:${{ steps.ver.outputs.new }}"
+            echo '```'
+            echo ""
+            echo "Full image history: https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/firefly-bot/tags"
+          } > changelog.md
+
+      # ── Commit version bump, create annotated tag, push ───────────────────
+      # Git state is established first so Docker Hub only receives an image
+      # that has a corresponding commit and tag in the repository.
+      - name: Commit and tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -u   # stage every tracked file that was modified above
+          git commit -m "chore: bump version to ${{ steps.ver.outputs.new }}"
+
+          git tag -a "${{ steps.ver.outputs.tag }}" \
+                  -m "Release ${{ steps.ver.outputs.tag }}"
+
+          # --follow-tags pushes annotated tags reachable from the new commit.
+          # Push back to the branch that triggered the workflow, not a hard-coded ref.
+          git push origin "HEAD:${{ github.ref_name }}" --follow-tags
+
+      # ── Push Docker image to Docker Hub ───────────────────────────────────
+      # Runs after the Git push so the published image always has a matching
+      # tag and commit in the repository.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/firefly-bot:${{ steps.ver.outputs.new }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/firefly-bot:latest
+
+      # ── Publish the GitHub Release ─────────────────────────────────────────
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: "Release ${{ steps.ver.outputs.tag }}"
+          body_path: changelog.md
+          files: build/libs/firefly-bot-${{ steps.ver.outputs.new }}.jar
