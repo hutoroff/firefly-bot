@@ -38,9 +38,9 @@ class TelegramWizardPresenter(private val pageSize: Int = 5) {
     /** Called when starting a new wizard — must send a fresh message and return its ID. */
     fun renderNewWizard(bot: TelegramLongPollingBot, chatId: Long): Message? {
         val keyboard = inlineKeyboard(listOf(
-            listOf(button("Transfer", "t:transfer")),
-            listOf(button("Withdrawal", "t:withdrawal")),
-            listOf(button("Deposit", "t:deposit")),
+            listOf(button("🔄 Transfer", "t:transfer")),
+            listOf(button("💸 Withdrawal", "t:withdrawal")),
+            listOf(button("💰 Deposit", "t:deposit")),
         ))
         return sendMessage(bot, chatId, "Select transaction type:", keyboard)
     }
@@ -49,9 +49,9 @@ class TelegramWizardPresenter(private val pageSize: Int = 5) {
 
     private fun renderTypeSelection(bot: TelegramLongPollingBot, chatId: Long, messageId: Int?) {
         val keyboard = inlineKeyboard(listOf(
-            listOf(button("Transfer", "t:transfer")),
-            listOf(button("Withdrawal", "t:withdrawal")),
-            listOf(button("Deposit", "t:deposit")),
+            listOf(button("🔄 Transfer", "t:transfer")),
+            listOf(button("💸 Withdrawal", "t:withdrawal")),
+            listOf(button("💰 Deposit", "t:deposit")),
         ))
         edit(bot, chatId, messageId, "Select transaction type:", keyboard)
     }
@@ -93,7 +93,7 @@ class TelegramWizardPresenter(private val pageSize: Int = 5) {
         if (start + pageSize < result.total) navRow += button("Next →", "$pagePrefix:${result.page + 1}")
         if (navRow.isNotEmpty()) rows += navRow
         val kindLabel = if (result.accountKind == WizardResult.AccountKind.EXPENSE) "expense" else "revenue"
-        rows += listOf(button("+ Create new $kindLabel account", createCallback))
+        rows += listOf(button("➕ Create new $kindLabel account", createCallback))
         val prompt = if (result.total == 0) {
             "No accounts found for \"${result.query}\". You can create a new one:"
         } else {
@@ -128,33 +128,33 @@ class TelegramWizardPresenter(private val pageSize: Int = 5) {
         val rows = mutableListOf<List<InlineKeyboardButton>>()
         when (session.transactionType) {
             TransactionType.TRANSFER -> {
-                rows += listOf(button("Change source account", "pv:sa"))
-                rows += listOf(button("Change destination account", "pv:da"))
+                rows += listOf(button("🏦 Change source account", "pv:sa"))
+                rows += listOf(button("🏦 Change destination account", "pv:da"))
                 if (session.amount != null) {
-                    rows += listOf(button("Change amount", "pv:amt"))
+                    rows += listOf(button("💱 Change amount", "pv:amt"))
                 } else {
-                    rows += listOf(button("Change source amount", "pv:samt"))
-                    rows += listOf(button("Change dest amount", "pv:damt"))
+                    rows += listOf(button("💱 Change source amount", "pv:samt"))
+                    rows += listOf(button("💱 Change dest amount", "pv:damt"))
                 }
             }
             TransactionType.WITHDRAWAL -> {
-                rows += listOf(button("Change source account", "pv:sa"))
-                rows += listOf(button("Change expense account", "pv:ea"))
-                rows += listOf(button("Change amount", "pv:amt"))
-                rows += listOf(button("Change category", "pv:cat"))
+                rows += listOf(button("🏦 Change source account", "pv:sa"))
+                rows += listOf(button("🏪 Change expense account", "pv:ea"))
+                rows += listOf(button("💱 Change amount", "pv:amt"))
+                rows += listOf(button("📂 Change category", "pv:cat"))
             }
             TransactionType.DEPOSIT -> {
-                rows += listOf(button("Change destination account", "pv:da"))
-                rows += listOf(button("Change revenue account", "pv:ra"))
-                rows += listOf(button("Change amount", "pv:amt"))
-                rows += listOf(button("Change category", "pv:cat"))
+                rows += listOf(button("🏦 Change destination account", "pv:da"))
+                rows += listOf(button("💼 Change revenue account", "pv:ra"))
+                rows += listOf(button("💱 Change amount", "pv:amt"))
+                rows += listOf(button("📂 Change category", "pv:cat"))
             }
             null -> {}
         }
-        rows += listOf(button("Change date/time", "pv:dt"))
-        rows += listOf(button(if (session.tag != null) "Change tag" else "Add tag", "pv:tag"))
-        rows += listOf(button(if (session.description != null) "Change description" else "Add description", "pv:desc"))
-        rows += listOf(button("Submit", "pv:sub"))
+        rows += listOf(button("📅 Change date/time", "pv:dt"))
+        rows += listOf(button(if (session.tag != null) "🔖 Change tag" else "🔖 Add tag", "pv:tag"))
+        rows += listOf(button(if (session.description != null) "📝 Change description" else "📝 Add description", "pv:desc"))
+        rows += listOf(button("✅ Submit", "pv:sub"))
         edit(bot, chatId, messageId, buildPreviewText(session), inlineKeyboard(rows))
     }
 
