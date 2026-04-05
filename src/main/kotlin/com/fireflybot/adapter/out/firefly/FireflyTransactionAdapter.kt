@@ -42,7 +42,7 @@ class FireflyTransactionAdapter(
 
     private fun Transaction.toRequest(): StoreTransactionRequest {
         val isoDate = dateTime.atOffset(ZoneOffset.UTC).format(isoFormatter)
-        val tagsList = tag?.let { listOf(it) }
+        val tagsList = listOfNotNull("tg", tag).distinct()
         val split = when (this) {
             is Transaction.Transfer -> TransactionSplit(
                 type = "transfer",
