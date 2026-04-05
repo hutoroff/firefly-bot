@@ -24,7 +24,9 @@ done until all tests pass and the build is clean.**
 - **Write tests for every new or changed behaviour.** If you add a new wizard step, callback
   prefix, or domain method, add corresponding unit tests before marking the task done.
 - **Coverage must never fall below 85% instruction coverage** for the three tested packages:
-  `domain/model`, `application/wizard`, and `adapter/out/mock`.
+  `domain/model`, `application/wizard`, and `adapter/out/mock` (which contains
+  `InMemoryWizardSessionRepository`). The Firefly III HTTP adapters in `adapter/out/firefly`
+  are integration-heavy and are intentionally not unit-tested.
 - After running tests, check coverage with:
 
 ```bash
@@ -104,8 +106,8 @@ domain/model/
   TransactionType.kt               — enum (TRANSFER, WITHDRAWAL, DEPOSIT)
   Transaction.kt                   — sealed class hierarchy
 
-adapter/out/mock/                  — in-memory implementations (current)
-adapter/out/firefly/               — real Firefly III HTTP implementations (swap in DI)
+adapter/out/mock/                  — InMemoryWizardSessionRepository (ConcurrentHashMap)
+adapter/out/firefly/               — real Firefly III HTTP implementations (all wired in DI)
 
 config/AppConfig.kt                — validated env-var config, read once at startup
 di/AppModule.kt                    — all Koin bindings

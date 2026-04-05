@@ -3,9 +3,11 @@ package com.fireflybot.application.wizard
 import com.fireflybot.adapter.out.mock.InMemoryWizardSessionRepository
 import com.fireflybot.application.port.out.AccountRepository
 import com.fireflybot.application.port.out.CategoryRepository
+import com.fireflybot.application.port.out.TagRepository
 import com.fireflybot.application.port.out.TransactionRepository
 import com.fireflybot.domain.model.Account
 import com.fireflybot.domain.model.Category
+import com.fireflybot.domain.model.Tag
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.*
@@ -29,9 +31,10 @@ class WizardServiceCommonTest {
     private val accountRepo = mockk<AccountRepository>()
     private val categoryRepo = mockk<CategoryRepository>()
     private val txRepo = mockk<TransactionRepository>()
+    private val tagRepo = mockk<TagRepository>()
     private val sessionRepo = InMemoryWizardSessionRepository()
     private val service = WizardService(
-        sessionRepo, accountRepo, categoryRepo, txRepo, listOf("food", "transport", "utilities"),
+        sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo,
     )
 
     @BeforeEach
@@ -39,6 +42,7 @@ class WizardServiceCommonTest {
         every { accountRepo.getAssetAccounts() } returns accounts
         every { categoryRepo.getCategories() } returns categories
         every { txRepo.createTransaction(any()) } returns "tx-id"
+        every { tagRepo.getTags() } returns listOf(Tag("1", "food"), Tag("2", "transport"), Tag("3", "utilities"))
     }
 
     // ── Session lifecycle ────────────────────────────────────────────────────
@@ -189,8 +193,8 @@ class WizardServiceCommonTest {
         val result = service.handleCallback(chatId, messageId, "pv:tag")
         assertTrue(result is WizardResult.ShowTagList)
         val tagList = result as WizardResult.ShowTagList
-        assertTrue(tagList.tags.contains("food"))
-        assertTrue(tagList.tags.contains("transport"))
+        assertTrue(tagList.tags.any { it.name == "food" })
+        assertTrue(tagList.tags.any { it.name == "transport" })
         assertTrue(sessionRepo.get(chatId)!!.step is WizardStep.SelectTag)
     }
 
@@ -241,11 +245,11 @@ class WizardServiceCommonTest {
     // ── Tag selection ─────────────────────────────────────────────────────────
 
     @Test
-    fun `tag selection stores tag and returns preview`() {
+    fun `tag selection resolves id to name and returns preview`() {
         driveToPreviewTransfer()
         service.handleCallback(chatId, messageId, "pv:tag")
 
-        val result = service.handleCallback(chatId, messageId, "tg:food")
+        val result = service.handleCallback(chatId, messageId, "tg:1") // id for "food"
         assertTrue(result is WizardResult.ShowPreview)
         val session = (result as WizardResult.ShowPreview).session
         assertEquals("food", session.tag)
@@ -253,11 +257,10 @@ class WizardServiceCommonTest {
     }
 
     @Test
-    fun `tag selection with any string stores it`() {
+    fun `tag selection with unknown id returns NoOp`() {
         driveToPreviewTransfer()
         service.handleCallback(chatId, messageId, "pv:tag")
-        val result = service.handleCallback(chatId, messageId, "tg:custom-tag")
-        assertTrue(result is WizardResult.ShowPreview)
-        assertEquals("custom-tag", (result as WizardResult.ShowPreview).session.tag)
+        val result = service.handleCallback(chatId, messageId, "tg:unknown-id")
+        assertTrue(result is WizardResult.NoOp)
     }
 }

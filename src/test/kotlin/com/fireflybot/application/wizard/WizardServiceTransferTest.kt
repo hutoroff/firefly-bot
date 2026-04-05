@@ -3,9 +3,11 @@ package com.fireflybot.application.wizard
 import com.fireflybot.adapter.out.mock.InMemoryWizardSessionRepository
 import com.fireflybot.application.port.out.AccountRepository
 import com.fireflybot.application.port.out.CategoryRepository
+import com.fireflybot.application.port.out.TagRepository
 import com.fireflybot.application.port.out.TransactionRepository
 import com.fireflybot.domain.model.Account
 import com.fireflybot.domain.model.Category
+import com.fireflybot.domain.model.Tag
 import com.fireflybot.domain.model.Transaction
 import io.mockk.every
 import io.mockk.mockk
@@ -27,9 +29,10 @@ class WizardServiceTransferTest {
     private val accountRepo = mockk<AccountRepository>()
     private val categoryRepo = mockk<CategoryRepository>()
     private val txRepo = mockk<TransactionRepository>()
+    private val tagRepo = mockk<TagRepository>()
     private val sessionRepo = InMemoryWizardSessionRepository()
     private val service = WizardService(
-        sessionRepo, accountRepo, categoryRepo, txRepo, listOf("food", "transport"),
+        sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo,
     )
 
     @BeforeEach
@@ -37,6 +40,7 @@ class WizardServiceTransferTest {
         every { accountRepo.getAssetAccounts() } returns allAccounts
         every { categoryRepo.getCategories() } returns listOf(Category("c1", "Food"))
         every { txRepo.createTransaction(any()) } returns "tx-id"
+        every { tagRepo.getTags() } returns listOf(Tag("t1", "food"), Tag("t2", "transport"), Tag("t3", "travel"))
     }
 
     // ── Type selection ────────────────────────────────────────────────────────
@@ -336,7 +340,7 @@ class WizardServiceTransferTest {
         service.handleCallback(chatId, messageId, "sa:1")
         service.handleCallback(chatId, messageId, "da:2")
         service.handleText(chatId, "150.00")
-        service.handleCallback(chatId, messageId, "tg:travel")
+        service.handleCallback(chatId, messageId, "tg:t3") // id for "travel"
 
         service.handleCallback(chatId, messageId, "pv:sub")
 

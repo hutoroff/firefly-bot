@@ -2,13 +2,14 @@ package com.fireflybot.di
 
 import com.fireflybot.adapter.`in`.telegram.FireflyBot
 import com.fireflybot.adapter.`in`.telegram.TelegramWizardPresenter
+import com.fireflybot.adapter.out.firefly.FireflyAccountAdapter
+import com.fireflybot.adapter.out.firefly.FireflyCategoryAdapter
+import com.fireflybot.adapter.out.firefly.FireflyTagAdapter
+import com.fireflybot.adapter.out.firefly.FireflyTransactionAdapter
 import com.fireflybot.adapter.out.mock.InMemoryWizardSessionRepository
-import com.fireflybot.adapter.out.mock.MockAccountAdapter
-import com.fireflybot.adapter.out.mock.MockCategoryAdapter
-import com.fireflybot.adapter.out.mock.MockData
-import com.fireflybot.adapter.out.mock.MockTransactionAdapter
 import com.fireflybot.application.port.out.AccountRepository
 import com.fireflybot.application.port.out.CategoryRepository
+import com.fireflybot.application.port.out.TagRepository
 import com.fireflybot.application.port.out.TransactionRepository
 import com.fireflybot.application.port.out.WizardSessionRepository
 import com.fireflybot.application.wizard.WizardService
@@ -53,11 +54,10 @@ val appModule = module {
     // ── Outbound adapters ─────────────────────────────────────────────────────
 
     single<WizardSessionRepository> { InMemoryWizardSessionRepository() }
-    single<AccountRepository> { MockAccountAdapter() }
-    single<CategoryRepository> { MockCategoryAdapter() }
-    // Use MockTransactionAdapter until real Firefly API wiring is complete.
-    // To switch to real calls, replace with: FireflyTransactionAdapter(get(), get())
-    single<TransactionRepository> { MockTransactionAdapter() }
+    single<AccountRepository> { FireflyAccountAdapter(get(), get()) }
+    single<CategoryRepository> { FireflyCategoryAdapter(get(), get()) }
+    single<TransactionRepository> { FireflyTransactionAdapter(get(), get()) }
+    single<TagRepository> { FireflyTagAdapter(get(), get()) }
 
     // ── Application ───────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ val appModule = module {
             accountRepository = get(),
             categoryRepository = get(),
             transactionRepository = get(),
-            tags = MockData.tags,
+            tagRepository = get(),
         )
     }
 

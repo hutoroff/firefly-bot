@@ -3,9 +3,11 @@ package com.fireflybot.application.wizard
 import com.fireflybot.adapter.out.mock.InMemoryWizardSessionRepository
 import com.fireflybot.application.port.out.AccountRepository
 import com.fireflybot.application.port.out.CategoryRepository
+import com.fireflybot.application.port.out.TagRepository
 import com.fireflybot.application.port.out.TransactionRepository
 import com.fireflybot.domain.model.Account
 import com.fireflybot.domain.model.Category
+import com.fireflybot.domain.model.Tag
 import com.fireflybot.domain.model.Transaction
 import io.mockk.every
 import io.mockk.mockk
@@ -35,9 +37,10 @@ class WizardServiceWithdrawalTest {
     private val accountRepo = mockk<AccountRepository>()
     private val categoryRepo = mockk<CategoryRepository>()
     private val txRepo = mockk<TransactionRepository>()
+    private val tagRepo = mockk<TagRepository>()
     private val sessionRepo = InMemoryWizardSessionRepository()
     private val service = WizardService(
-        sessionRepo, accountRepo, categoryRepo, txRepo, listOf("food", "transport"),
+        sessionRepo, accountRepo, categoryRepo, txRepo, tagRepo,
     )
 
     @BeforeEach
@@ -49,6 +52,7 @@ class WizardServiceWithdrawalTest {
         every { accountRepo.searchExpenseAccounts("") } returns expenseAccounts
         every { categoryRepo.getCategories() } returns categories
         every { txRepo.createTransaction(any()) } returns "tx-id"
+        every { tagRepo.getTags() } returns listOf(Tag("1", "food"), Tag("2", "transport"))
     }
 
     // ── Type selection ────────────────────────────────────────────────────────

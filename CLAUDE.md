@@ -24,7 +24,8 @@ JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle
 
 **Tests must pass before declaring a task done.**
 Always write or update tests for every new or changed behaviour. Coverage for `domain/model`,
-`application/wizard`, and `adapter/out/mock` must never fall below **85%** (instruction coverage).
+`application/wizard`, and `adapter/out/mock` (which contains `InMemoryWizardSessionRepository`)
+must never fall below **85%** (instruction coverage).
 Check after running tests:
 
 ```bash
@@ -102,7 +103,7 @@ introducing new patterns or port interfaces, or changing the build setup.
 The project uses **hexagonal architecture** (ports & adapters):
 
 ```
-Telegram ──(inbound adapter)──▶ Application (WizardService) ──(outbound ports)──▶ Firefly III / Mocks
+Telegram ──(inbound adapter)──▶ Application (WizardService) ──(outbound ports)──▶ Firefly III
 ```
 
 Layers:
@@ -124,17 +125,12 @@ Layers:
 | `application/wizard/WizardService.kt` | Core wizard logic; must have zero Telegram imports |
 | `adapter/in/telegram/FireflyBot.kt` | Slim dispatcher: update → useCase → presenter |
 | `adapter/in/telegram/TelegramWizardPresenter.kt` | All Telegram rendering |
-| `adapter/out/mock/MockData.kt` | Dev-time mock data |
-| `adapter/out/firefly/FireflyTransactionAdapter.kt` | Real Firefly III HTTP calls |
-
-## Switching mock → real adapters
-
-Change the relevant binding in `di/AppModule.kt`:
-
-```kotlin
-// Real transactions:
-single<TransactionRepository> { FireflyTransactionAdapter(get(), get()) }
-```
+| `adapter/out/mock/InMemoryWizardSessionRepository.kt` | In-memory session store |
+| `adapter/out/firefly/FireflyTransactionAdapter.kt` | Firefly III transaction HTTP calls |
+| `adapter/out/firefly/FireflyAccountAdapter.kt` | Firefly III account HTTP calls |
+| `adapter/out/firefly/FireflyCategoryAdapter.kt` | Firefly III category HTTP calls |
+| `adapter/out/firefly/FireflyTagAdapter.kt` | Firefly III tag HTTP calls |
+| `adapter/out/firefly/dto/` | Serialization DTOs for all Firefly III responses |
 
 ## Adding a new Telegram command
 

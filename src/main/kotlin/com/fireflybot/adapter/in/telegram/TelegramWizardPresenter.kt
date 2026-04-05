@@ -118,7 +118,9 @@ class TelegramWizardPresenter(private val pageSize: Int = 5) {
         messageId: Int?,
         result: WizardResult.ShowTagList,
     ) {
-        val rows = result.tags.chunked(2).map { row -> row.map { tag -> button(tag, "tg:$tag") } }
+        val rows = result.tags.chunked(2).map { row ->
+            row.map { tag -> button(tag.name, "tg:${tag.id}") }
+        }
         edit(bot, chatId, messageId, "Select a tag:", inlineKeyboard(rows))
     }
 

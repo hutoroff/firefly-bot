@@ -2,6 +2,7 @@ package com.fireflybot.application.wizard
 
 import com.fireflybot.domain.model.Account
 import com.fireflybot.domain.model.Category
+import com.fireflybot.domain.model.Tag
 
 sealed class WizardResult {
 
@@ -38,7 +39,7 @@ sealed class WizardResult {
     ) : WizardResult()
 
     /** Show the tag selection grid. */
-    data class ShowTagList(val tags: List<String>) : WizardResult()
+    data class ShowTagList(val tags: List<Tag>) : WizardResult()
 
     /** Show the transaction preview screen. */
     data class ShowPreview(val session: WizardSession) : WizardResult()

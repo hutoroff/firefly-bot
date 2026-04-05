@@ -3,6 +3,7 @@ package com.fireflybot.application.wizard
 import com.fireflybot.application.port.`in`.WizardUseCase
 import com.fireflybot.application.port.out.AccountRepository
 import com.fireflybot.application.port.out.CategoryRepository
+import com.fireflybot.application.port.out.TagRepository
 import com.fireflybot.application.port.out.TransactionRepository
 import com.fireflybot.application.port.out.WizardSessionRepository
 import com.fireflybot.domain.model.Transaction
@@ -17,7 +18,7 @@ class WizardService(
     private val accountRepository: AccountRepository,
     private val categoryRepository: CategoryRepository,
     private val transactionRepository: TransactionRepository,
-    private val tags: List<String>,
+    private val tagRepository: TagRepository,
     private val pageSize: Int = 5,
 ) : WizardUseCase {
 
@@ -425,7 +426,7 @@ class WizardService(
         }
         "tag" -> {
             sessionRepository.save(session.copy(step = WizardStep.SelectTag))
-            WizardResult.ShowTagList(tags)
+            WizardResult.ShowTagList(tagRepository.getTags())
         }
         "sub" -> if (session.step is WizardStep.Preview) handleSubmit(session) else WizardResult.NoOp
         else -> WizardResult.NoOp
@@ -446,8 +447,9 @@ class WizardService(
 
     // ── Tag selection ─────────────────────────────────────────────────────────
 
-    private fun handleTagSelected(session: WizardSession, tag: String): WizardResult {
-        val updated = session.copy(step = WizardStep.Preview, tag = tag)
+    private fun handleTagSelected(session: WizardSession, tagId: String): WizardResult {
+        val tagName = tagRepository.getTags().find { it.id == tagId }?.name ?: return WizardResult.NoOp
+        val updated = session.copy(step = WizardStep.Preview, tag = tagName)
         sessionRepository.save(updated)
         return WizardResult.ShowPreview(updated)
     }
