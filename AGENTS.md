@@ -16,7 +16,7 @@ Also verify the fat JAR compiles:
 JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home gradle shadowJar --no-daemon
 ```
 
-A successful build produces `build/libs/firefly-bot-1.1.0.jar`. **Do not declare a task
+A successful build produces `build/libs/firefly-bot-1.1.1.jar`. **Do not declare a task
 done until all tests pass and the build is clean.**
 
 ## Testing rules
