@@ -138,7 +138,7 @@ JAVA_HOME=~/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home ./grad
 
 # Load env vars from .env, then run
 export $(grep -v '^#' .env | xargs)
-java -jar build/libs/firefly-bot-1.0.0.jar
+java -jar build/libs/firefly-bot-1.0.1.jar
 ```
 
 ## Usage
