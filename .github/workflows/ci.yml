@@ -45,7 +45,7 @@ jobs:
         run: gradle test jacocoTestReport --no-daemon
 
       # Fails the build when any watched package drops below 85 %.
-      - name: Enforce 85 % instruction-coverage floor
+      - name: Enforce 75 % instruction-coverage floor
         run: gradle jacocoTestCoverageVerification --no-daemon
 
       # ── Persist baseline after every green push to main ───────────────────────

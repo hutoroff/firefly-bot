@@ -53,6 +53,9 @@ application {
 
 tasks.shadowJar {
     archiveClassifier.set("")
+    manifest {
+        attributes["Main-Class"] = application.mainClass.get()
+    }
 }
 
 tasks.build {
