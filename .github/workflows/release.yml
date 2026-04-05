@@ -27,13 +27,16 @@ on:
 
 jobs:
 
-  # ── Guard: abort early unless CI is green on the exact commit being released ─
-  guard:
-    name: Verify CI passed on HEAD
+  # ── Single job: guard → bump → build → commit/tag/push → Docker → GitHub release ─
+  release:
+    name: Build and publish release
     runs-on: ubuntu-latest
     permissions:
-      actions: read   # needed to query workflow runs
+      contents: write   # push version-bump commit + tag, create GitHub release
+      actions: read     # query CI workflow runs
+
     steps:
+      # ── Guard: abort unless we're on main with a green CI run ──────────
       # workflow_dispatch has no branch filter, so reject non-main refs here.
       - name: Ensure this is running from main
         run: |
@@ -63,16 +66,7 @@ jobs:
 
           echo "CI is green for ${{ github.sha }} ✓"
 
-  # ── Release: bump → build → commit/tag/push → CI gate → Docker → GitHub release ─
-  release:
-    name: Build and publish release
-    needs: guard
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write   # push version-bump commit + tag, create GitHub release
-      actions: read     # poll CI status on the version-bump commit
-
-    steps:
+      # ── Setup ──────────────────────────────────────────────────────────
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -86,7 +80,7 @@ jobs:
           distribution: temurin
           cache: gradle
 
-      # ── Compute the next semantic version ─────────────────────────────────
+      # ── Compute the next semantic version ─────────────────────────────
       - name: Compute new version
         id: ver
         run: |
@@ -104,7 +98,7 @@ jobs:
           echo "new=$NEW"     >> "$GITHUB_OUTPUT"
           echo "tag=v$NEW"    >> "$GITHUB_OUTPUT"
 
-      # ── Apply the new version to all relevant files ────────────────────────
+      # ── Apply the new version to all relevant files ────────────────────
       - name: Bump version in build.gradle.kts and docs
         run: |
           CUR="${{ steps.ver.outputs.current }}"
@@ -117,11 +111,11 @@ jobs:
           git grep -l "firefly-bot-$CUR" -- '*.md' \
             | xargs -r sed -i "s/firefly-bot-$CUR/firefly-bot-$NEW/g"
 
-      # ── Build the fat JAR ──────────────────────────────────────────────────
+      # ── Build the fat JAR ─────────────────────────────────────────────
       - name: Build fat JAR
         run: gradle shadowJar --no-daemon
 
-      # ── Assemble release notes ─────────────────────────────────────────────
+      # ── Assemble release notes ────────────────────────────────────────
       - name: Generate changelog
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -146,7 +140,7 @@ jobs:
             echo "Full image history: https://hub.docker.com/r/${{ vars.DOCKERHUB_USERNAME }}/firefly-bot/tags"
           } > changelog.md
 
-      # ── Commit version bump, create annotated tag, push ───────────────────
+      # ── Commit version bump, create annotated tag, push ────────────────
       # Git state is established first so Docker Hub only receives an image
       # that has a corresponding commit and tag in the repository.
       - name: Commit and tag
@@ -164,50 +158,15 @@ jobs:
           # Push back to the branch that triggered the workflow, not a hard-coded ref.
           git push origin "HEAD:${{ github.ref_name }}" --follow-tags
 
-      # ── Wait for CI to pass on the version-bump commit ────────────────────
-      # The guard job verified CI on the pre-bump HEAD. The version bump
-      # itself changes only build.gradle.kts and docs, but we still require
-      # a green CI run on the exact commit being released before publishing.
-      # Polls every 30 s for up to 15 min; fails the release if CI fails.
-      - name: Wait for CI on version-bump commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          SHA=$(git rev-parse HEAD)
-          echo "Polling CI for commit $SHA (up to 15 min) …"
-          for i in $(seq 1 30); do
-            ROW=$(gh run list \
-              --repo  "$GITHUB_REPOSITORY" \
-              --workflow ci.yml \
-              --commit "$SHA" \
-              --limit  1 \
-              --json   status,conclusion \
-              --jq     '.[0] // empty')
-
-            STATUS=$(echo     "$ROW" | jq -r '.status     // "pending"')
-            CONCLUSION=$(echo "$ROW" | jq -r '.conclusion // ""')
-
-            echo "  attempt $i/30 — status=$STATUS conclusion=$CONCLUSION"
-
-            if   [ "$STATUS" = "completed" ] && [ "$CONCLUSION" = "success" ]; then
-              echo "CI passed ✓"; exit 0
-            elif [ "$STATUS" = "completed" ]; then
-              echo "::error::CI ended with conclusion '$CONCLUSION' — aborting release"
-              exit 1
-            fi
-            sleep 30
-          done
-          echo "::error::Timed out waiting for CI on $SHA"
-          exit 1
-
-      # ── Push Docker image to Docker Hub ───────────────────────────────────
-      # Runs after the CI gate so the published image always has a matching
-      # green CI run on its exact commit.
+      # ── Push Docker image to Docker Hub ────────────────────────────────
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -220,8 +179,10 @@ jobs:
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/firefly-bot:${{ steps.ver.outputs.new }}
             ${{ vars.DOCKERHUB_USERNAME }}/firefly-bot:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # ── Publish the GitHub Release ─────────────────────────────────────────
+      # ── Publish the GitHub Release ─────────────────────────────────────
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
