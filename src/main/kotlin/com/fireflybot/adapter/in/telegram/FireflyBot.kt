@@ -37,9 +37,15 @@ class FireflyBot(
                 val chatId = query.message.chatId
                 val messageId = query.message.messageId
                 log.info { "Received callback from user=${query.from?.id} chat=$chatId" }
-                answerCallback(query.id)
-                val result = wizardUseCase.handleCallback(chatId, messageId, query.data ?: return)
-                presenter.render(this, chatId, messageId, result)
+                // Answer AFTER render so the button spinner stays visible while data loads.
+                // finally guarantees the answer even if handleCallback or render throw,
+                // and even if query.data is null (return inside try still triggers finally).
+                try {
+                    val result = wizardUseCase.handleCallback(chatId, messageId, query.data ?: return)
+                    presenter.render(this, chatId, messageId, result)
+                } finally {
+                    answerCallback(query.id)
+                }
             }
             update.hasMessage() -> handleMessage(update.message)
         }
