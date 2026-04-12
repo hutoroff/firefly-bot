@@ -24,7 +24,7 @@ data class TransactionSplit(
     @SerialName("destination_id") val destinationId: String? = null,
     @SerialName("source_name") val sourceName: String? = null,
     @SerialName("destination_name") val destinationName: String? = null,
-    val category: String? = null,
+    @SerialName("category_name") val category: String? = null,
     val notes: String? = null,
     val tags: List<String>? = null,
 )
