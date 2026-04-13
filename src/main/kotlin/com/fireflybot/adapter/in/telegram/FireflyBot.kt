@@ -6,6 +6,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
@@ -62,6 +63,7 @@ class FireflyBot(
                 val wizardMsgId = wizardUseCase.getWizardMessageId(chatId)
                 val result = wizardUseCase.handleText(chatId, text)
                 presenter.render(this, chatId, wizardMsgId, result)
+                deleteMessage(chatId, message.messageId)
             }
         }
     }
@@ -82,6 +84,14 @@ class FireflyBot(
             )
         } catch (e: TelegramApiException) {
             log.error(e) { "Failed to send /start reply to chat=$chatId" }
+        }
+    }
+
+    private fun deleteMessage(chatId: Long, messageId: Int) {
+        try {
+            execute(DeleteMessage.builder().chatId(chatId).messageId(messageId).build())
+        } catch (e: TelegramApiException) {
+            log.error(e) { "Failed to delete message=$messageId in chat=$chatId" }
         }
     }
 
